@@ -147,9 +147,11 @@ export default function MovieDetail() {
           </div>
 
           <div className="pt-4">
-            <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-600/30 text-center text-base">
-              Забронювати
-            </button>
+            <Link href={`/movies/${movieId}/seats`}>
+             <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-600/30 text-center text-base">
+                   Забронювати
+             </button>
+            </Link>
           </div>
         </div>
       </main>
