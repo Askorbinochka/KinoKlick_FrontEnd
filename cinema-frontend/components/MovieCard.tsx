@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 interface MovieCardProps {
+  id: number;
   title: string;
   genre: string;
   rating: number;
@@ -9,9 +10,9 @@ interface MovieCardProps {
   image: string;
 }
 
-export default function MovieCard({ title, genre, rating, sessions, price, image }: MovieCardProps) {
+export default function MovieCard({ id, title, genre, rating, sessions, price, image }: MovieCardProps) {
   return (
-    <Link href="/movies/1" className="bg-[#131822] border border-gray-800/80 rounded-2xl p-3.5 flex flex-col justify-between hover:border-gray-700 transition group block">
+    <Link href={`/movies/${id}`} className="bg-[#131822] border border-gray-800/80 rounded-2xl p-3.5 flex flex-col justify-between hover:border-gray-700 transition group block">
       {/* Постер фільму */}
       <div className="w-full aspect-[2/3] rounded-xl mb-3 overflow-hidden relative bg-gray-900">
         <img 

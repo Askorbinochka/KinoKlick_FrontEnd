@@ -49,10 +49,10 @@ export default function Home() {
 
         {/* Сітка фільмів */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-          {movies.map((movie, index) => (
-            <MovieCard key={index} {...movie} />
-          ))}
-        </div>
+  {movies.map((movie, index) => (
+    <MovieCard key={index} id={index} {...movie} />
+  ))}
+</div>
       </main>
     </div>
   );
