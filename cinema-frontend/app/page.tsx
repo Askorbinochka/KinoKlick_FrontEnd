@@ -2,35 +2,9 @@ import Navbar from "@/components/Navbar";
 import HeroBanner from "@/components/HeroBanner";
 import DateFilter from "@/components/DateFilter";
 import MovieCard from "@/components/MovieCard";
+import { movies } from "./moviesData"; // Виправляємо шлях до твого файлу
 
 export default function Home() {
-  const movies = [
-    { title: "Кузьма: Страшно веселий",
-       genre: "Документальний, Музика",
-        rating: 9.9, 
-        sessions: ["14:30", "17:15", "20:00"],
-         price: 150,
-          image: "/images/kuzma.webp"},
-    { title: "Над безоднею 2",
-       genre: "Трилер",
-       rating: 7.8, 
-       sessions: ["14:00", "17:30", "20:45"], 
-       price: 150,
-      image: "/images/fall2.webp" },
-    { title: "Астрал: За межами Потойбіччя",
-       genre: "Жахи, Трилер",
-        rating: 8.7, 
-        sessions: ["15:00", "18:15", "21:30"],
-        price: 170 ,
-      image: "/images/astral.webp" },
-    { title: "Відважний Давид проти Велетня",
-       genre: "Мультфільм, Сімейний",
-        rating: 8.0,
-         sessions: ["16:30", "18:45", "22:15"], 
-         price: 100 ,
-        image: "/images/david.jpg"},
-  ];
-
   return (
     <div className="min-h-screen bg-[#0d1117] text-white">
       <Navbar />
@@ -49,10 +23,10 @@ export default function Home() {
 
         {/* Сітка фільмів */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-  {movies.map((movie, index) => (
-    <MovieCard key={index} id={index} {...movie} />
-  ))}
-</div>
+          {movies.map((movie) => (
+            <MovieCard key={movie.id} {...movie} />
+          ))}
+        </div>
       </main>
     </div>
   );
