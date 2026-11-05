@@ -7,10 +7,8 @@ interface MovieCardProps {
 }
 
 export default function MovieCard({ movie }: MovieCardProps) {
-  // Підтягуємо posterUrl з бекенду (з фолбеком на image, якщо десь залишилася стара назва)
   const imageUrl = movie.posterUrl || (movie as any).image || "/placeholder.jpg";
   
-  // Форматуємо жанри: якщо масив — об'єднуємо через кому, якщо рядок — залишаємо як є
   const genresText = Array.isArray(movie.genres) 
     ? movie.genres.join(", ") 
     : movie.genres;
@@ -29,9 +27,22 @@ export default function MovieCard({ movie }: MovieCardProps) {
           <h2 className="text-xl font-bold text-white mb-2">{movie.title}</h2>
           <p className="text-gray-400 text-sm mb-2">{genresText}</p>
           <div className="flex justify-between items-center text-sm text-gray-300">
-            <span>⭐ {movie.rating}</span>
-            <span>⏱️ {movie.duration} хв</span>
-          </div>
+
+  <div className="flex items-center space-x-1">
+    <svg className="w-4 h-4 text-yellow-500 fill-current" viewBox="0 0 24 24">
+      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+    </svg>
+    <span>{movie.rating}</span>
+  </div>
+
+  <div className="flex items-center space-x-1">
+    <svg className="w-4 h-4 text-gray-400 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+    <span>{movie.duration} хв</span>
+  </div>
+</div>
         </div>
       </div>
       
