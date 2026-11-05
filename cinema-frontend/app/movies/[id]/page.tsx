@@ -1,157 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Link from "next/link";
-import { movies } from "@/app/moviesData";
 
-export default function MovieDetail() {
+export default function MovieDetailsPage() {
   const params = useParams();
-  
-  const movieId = Number(params.id) || 0;
+  const movieId = params.id; // Отримуємо id фільму з URL
 
-  const movie = movies[movieId] || movies[0];
+  const [movie, setMovie] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedDate, setSelectedDate] = useState("ПН 14");
-  const [selectedTime, setSelectedTime] = useState(movie.sessions[0] || "14:30");
+  useEffect(() => {
+    if (!movieId) return;
 
-  const dates = [
-    { day: "ПН", date: "14" },
-    { day: "ВТ", date: "15" },
-    { day: "СР", date: "16" },
-    { day: "ЧТ", date: "17" },
-    { day: "ПТ", date: "18" },
-  ];
+    fetch(`https://kinoklick-backend.onrender.com/movies/${movieId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setMovie(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Помилка завантаження фільму:", err);
+        setLoading(false);
+      });
+  }, [movieId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0d1117] text-white">
+        <Navbar />
+        <div className="text-center py-20 text-gray-400">Завантаження інформації про фільм...</div>
+      </div>
+    );
+  }
+
+  if (!movie) {
+    return (
+      <div className="min-h-screen bg-[#0d1117] text-white">
+        <Navbar />
+        <div className="text-center py-20 text-red-500">Фільм не знайдено</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0b0e14] text-white">
+    <div className="min-h-screen bg-[#0d1117] text-white">
       <Navbar />
+      
+      <main className="container mx-auto px-8 py-8">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Постер фільму */}
+          <div className="w-full md:w-1/3">
+            <img 
+              src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"} 
+              alt={movie.title}
+              className="w-full rounded-lg shadow-lg object-cover" 
+            />
+          </div>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
-
-        <div className="text-sm text-gray-400 flex items-center gap-2">
-          <Link href="/" className="hover:text-white transition">КіноКлік</Link> &gt; <span>Фільми</span> &gt; <span className="text-white font-medium">{movie.title}</span>
-        </div>
-
-        {/* Блок інформації про фільм (динамічний) */}
-        <div className="bg-[#121621] border border-gray-800/80 rounded-3xl p-6 md:p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
-          <div className="md:col-span-4 flex flex-col gap-4">
-            <div className="w-full aspect-[2/3] rounded-2xl overflow-hidden relative bg-gray-900 border border-gray-800">
-              <span className="absolute top-3 right-3 bg-black/60 backdrop-blur text-xs px-2.5 py-1 rounded-md font-semibold z-10">
-                {movie.age}
-              </span>
-              <img 
-                src={movie.image} 
-                alt={movie.title} 
-                className="w-full h-full object-cover"
-              />
-            </div>
+          {/* Деталі фільму */}
+          <div className="w-full md:w-2/3">
+            <h1 className="text-4xl font-bold mb-4">{movie.title}</h1>
+            <p className="text-gray-400 text-sm mb-4">Жанри: {Array.isArray(movie.genres) ? movie.genres.join(", ") : movie.genres}</p>
+            <p className="text-gray-300 mb-6 leading-relaxed">{movie.description}</p>
             
-            <button className="flex items-center justify-center gap-2 border border-gray-700 hover:border-gray-500 text-white font-medium text-sm py-3 rounded-xl transition bg-black/40 backdrop-blur">
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 3l14 9-14 9V3z"/>
-              </svg>
-              <span>Дивитись трейлер</span>
+            <div className="flex gap-6 text-sm text-gray-300 mb-6">
+              <div>⭐ Рейтинг: <span className="font-bold text-white">{movie.rating}</span></div>
+              <div>⏱️ Тривалість: <span className="font-bold text-white">{movie.duration} хв</span></div>
+            </div>
+
+            <button className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition">
+              Обрати сеанс та місце
             </button>
-          </div>
-
-          <div className="md:col-span-8 space-y-6">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white">
-              {movie.title}
-            </h1>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-sm border-t border-b border-gray-800/80 py-4">
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Вікові обмеження</span>
-                <span className="font-medium text-white">{movie.age}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Рік</span>
-                <span className="font-medium text-white">{movie.year}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Режисер</span>
-                <span className="font-medium text-white">{movie.director}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Мова</span>
-                <span className="font-medium text-white">{movie.language}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Жанр</span>
-                <span className="font-medium text-white">{movie.genre}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Тривалість</span>
-                <span className="font-medium text-white">{movie.duration}</span>
-              </div>
-              <div className="flex justify-between sm:justify-start sm:gap-12">
-                <span className="text-gray-400">Виробництво</span>
-                <span className="font-medium text-white">{movie.country}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-sm text-gray-300/90 leading-relaxed">
-              <p>{movie.description}</p>
-              <p className="text-gray-400 text-xs">{movie.subDescription}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Вибір сеансів */}
-        <div className="bg-[#121621] border border-gray-800/80 rounded-3xl p-6 md:p-8 space-y-6">
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Виберіть дату</h3>
-            <div className="flex flex-wrap gap-3">
-              {dates.map((item, idx) => {
-                const btnLabel = `${item.day} ${item.date}`;
-                const isSelected = selectedDate === btnLabel;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedDate(btnLabel)}
-                    className={`px-5 py-2.5 rounded-xl font-medium text-sm transition border ${
-                      isSelected 
-                        ? "bg-red-600 text-white border-red-600 shadow-lg shadow-red-600/30" 
-                        : "bg-[#181f2d] text-gray-300 border-gray-800 hover:border-gray-700"
-                    }`}
-                  >
-                    {item.day} {item.date}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Виберіть час</h3>
-            <div className="flex flex-wrap gap-3">
-              {movie.sessions.map((time, idx) => {
-                const isSelected = selectedTime === time;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedTime(time)}
-                    className={`px-6 py-3 rounded-xl font-medium text-sm transition border ${
-                      isSelected 
-                        ? "bg-[#181f2d] text-white border-red-600 ring-1 ring-red-600" 
-                        : "bg-[#181f2d] text-gray-300 border-gray-800 hover:border-gray-700"
-                    }`}
-                  >
-                    {time} | від {movie.price} грн
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="pt-4">
-            <Link href={`/movies/${movieId}/seats`}>
-             <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-600/30 text-center text-base">
-                   Забронювати
-             </button>
-            </Link>
           </div>
         </div>
       </main>
