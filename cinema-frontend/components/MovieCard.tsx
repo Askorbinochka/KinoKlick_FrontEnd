@@ -1,61 +1,48 @@
+import Image from "next/image";
 import Link from "next/link";
+import { Movie } from "@/app/page";
 
 interface MovieCardProps {
-  id: number;
-  title: string;
-  genre: string;
-  rating: number;
-  sessions: string[];
-  price: number;
-  image: string;
+  movie: Movie;
 }
 
-export default function MovieCard({ id, title, genre, rating, sessions, price, image }: MovieCardProps) {
+export default function MovieCard({ movie }: MovieCardProps) {
+  // Підтягуємо posterUrl з бекенду (з фолбеком на image, якщо десь залишилася стара назва)
+  const imageUrl = movie.posterUrl || (movie as any).image || "/placeholder.jpg";
+  
+  // Форматуємо жанри: якщо масив — об'єднуємо через кому, якщо рядок — залишаємо як є
+  const genresText = Array.isArray(movie.genres) 
+    ? movie.genres.join(", ") 
+    : movie.genres;
+
   return (
-    <Link href={`/movies/${id}`} className="bg-[#131822] border border-gray-800/80 rounded-2xl p-3.5 flex flex-col justify-between hover:border-gray-700 transition group block">
-      {/* Постер фільму */}
-      <div className="w-full aspect-[2/3] rounded-xl mb-3 overflow-hidden relative bg-gray-900">
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
-        />
-      </div>
-
-      {/* Інформація про фільм */}
-      <div className="flex flex-col flex-grow justify-between">
-        <div>
-          <h3 className="font-bold text-white text-base line-clamp-1 mb-1">{title}</h3>
-          
-          <div className="flex justify-between items-center text-xs text-gray-400 mb-3">
-            <span className="line-clamp-1">{genre}</span>
-            <span className="text-yellow-400 font-semibold flex items-center gap-1 shrink-0">
-              ★ {rating}
-            </span>
-          </div>
-
-          {/* Розклад сеансів */}
-          <p className="text-[10px] text-gray-500 font-semibold mb-2 tracking-wider uppercase">
-            РОЗКЛАД
-          </p>
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {sessions.map((time, idx) => (
-              <span 
-                key={idx} 
-                className="text-xs bg-[#1a202c] text-gray-300 px-2.5 py-1 rounded-md border border-gray-800"
-              >
-                {time}
-              </span>
-            ))}
+    <div className="bg-slate-800 rounded-lg overflow-hidden shadow-lg hover:scale-105 transition-transform duration-300 flex flex-col justify-between">
+      <div>
+        <div className="relative h-96 w-full">
+          <img
+            src={imageUrl}
+            alt={movie.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="p-4">
+          <h2 className="text-xl font-bold text-white mb-2">{movie.title}</h2>
+          <p className="text-gray-400 text-sm mb-2">{genresText}</p>
+          <div className="flex justify-between items-center text-sm text-gray-300">
+            <span>⭐ {movie.rating}</span>
+            <span>⏱️ {movie.duration} хв</span>
           </div>
         </div>
-
-        {/* Ціна квитків */}
-        <div className="flex justify-between items-baseline pt-2 border-t border-gray-800/60">
-          <span className="text-xs text-gray-400">Квитки від</span>
-          <span className="text-base font-bold text-white">{price} грн</span>
-        </div>
       </div>
-    </Link>
+      
+      <div className="p-4 pt-0">
+        <Link 
+          href={`/movies/${movie.id}`}
+          className="block w-full text-center bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-md transition-colors"
+        >
+          Купити квиток
+        </Link>
+      </div>
+    </div>
   );
 }

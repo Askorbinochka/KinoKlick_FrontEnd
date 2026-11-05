@@ -1,33 +1,56 @@
-import Navbar from "@/components/Navbar";
-import HeroBanner from "@/components/HeroBanner";
-import DateFilter from "@/components/DateFilter";
+"use client";
+
+import { useState, useEffect } from "react";
 import MovieCard from "@/components/MovieCard";
-import { movies } from "./moviesData"; // Виправляємо шлях до твого файлу
 
-export default function Home() {
+export interface Movie {
+  id: string;
+  title: string;
+  description: string;
+  posterUrl: string;
+  genres: string[];
+  duration: number;
+  rating: number;
+  trailerUrl?: string;
+  director?: string;
+  language?: string;
+  ageRestriction?: number;
+}
+
+export default function HomePage() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    // 2. Робимо запит до сервера на Render
+    fetch("https://kinoklick-backend.onrender.com/movies")
+      .then((res) => res.json())
+      .then((data: Movie[]) => {
+        setMovies(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Помилка завантаження фільмів:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh] text-white">
+        <p className="text-xl">Завантаження фільмів з сервера...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white">
-      <Navbar />
-
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pb-12">
-        <HeroBanner />
-        <DateFilter />
-
-        {/* Секція Зараз у кіно */}
-        <div className="flex justify-between items-center my-6">
-          <h2 className="text-xl font-bold text-white">Зараз у кіно</h2>
-          <button className="text-xs text-red-500 hover:text-red-400 font-semibold">
-            Дивитися всі →
-          </button>
-        </div>
-
-        {/* Сітка фільмів */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-          {movies.map((movie) => (
-            <MovieCard key={movie.id} {...movie} />
-          ))}
-        </div>
-      </main>
-    </div>
+    <main className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-white mb-6">Зараз у кіно</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {movies.map((movie) => (
+          <MovieCard key={movie.id} movie={movie} />
+        ))}
+      </div>
+    </main>
   );
 }
