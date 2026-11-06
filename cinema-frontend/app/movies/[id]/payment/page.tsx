@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { movies } from "../../../moviesData";
 
-export default function PaymentPage() {
+function PaymentContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   
@@ -17,7 +17,7 @@ export default function PaymentPage() {
   // Зчитуємо динамічні параметри з посилання (місця, суму, дату та час)
   const seatsParam = searchParams.get("seats") || "";
   const totalParam = searchParams.get("total") || String(movie.price);
-  const selectedDate = searchParams.get("date") || "14 вересня";
+  const selectedDate = searchParams.get("date") || "14 листопада";
   const selectedTime = searchParams.get("time") || "18:15";
 
   const totalPrice = Number(totalParam);
@@ -83,7 +83,7 @@ export default function PaymentPage() {
                     <label className="block text-xs text-gray-400 mb-1">ІМ'Я ВЛАСНИКА КАРТКИ</label>
                     <input 
                       type="text" 
-                      placeholder="наприклад, Андрій Соповський" 
+                      placeholder="наприклад, Тетяна Малецька" 
                       required
                       className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
                     />
@@ -138,7 +138,7 @@ export default function PaymentPage() {
                       <label className="block text-xs text-gray-400 mb-1">EMAIL</label>
                       <input 
                         type="email" 
-                        placeholder="andrii.sopovskli@gmail.com" 
+                        placeholder="example@gmail.com" 
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -180,9 +180,9 @@ export default function PaymentPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{movie.title}</h2>
-                  {/* ТУТ ТЕПЕР ПІДТЯГУЄТЬСЯ ДИНАМІЧНА ДАТА І ЧАС */}
                   <p className="text-xs text-red-500 font-medium mt-1">
-                    Зал 3 • {selectedDate} {selectedTime} • {formattedSeats}
+                    Зал 3 • {selectedDate} {selectedTime} <br />
+                    {formattedSeats}
                   </p>
                 </div>
 
@@ -249,7 +249,7 @@ export default function PaymentPage() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 text-center tracking-wide">СКАНУЙТЕ ПРИ ВХОДІ до ЗАЛИ</p>
-                <p className="text-[10px] text-gray-600 font-mono">РЕФ: KKL-20261014-0938</p>
+                <p className="text-[10px] text-gray-600 font-mono">РЕФ: KKL-20261114-0938</p>
               </div>
             </div>
 
@@ -264,5 +264,13 @@ export default function PaymentPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] text-white text-center py-20">Завантаження...</div>}>
+      <PaymentContent />
+    </Suspense>
   );
 }
