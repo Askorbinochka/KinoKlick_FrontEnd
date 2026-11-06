@@ -1,13 +1,11 @@
 "use client";
 
-export const dynamic = 'force-dynamic'; 
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 
-export default function MovieDetailsPage() {
+function MovieDetailsContent() {
   const params = useParams();
   const movieId = params.id;
 
@@ -56,7 +54,7 @@ export default function MovieDetailsPage() {
       <Navbar />
       
       <main className="container mx-auto px-8 py-8 space-y-8">
-      
+        
         <div className="text-xs text-gray-400 flex items-center gap-2">
           <Link href="/" className="hover:text-white transition">КіноКлік</Link>
           <span>›</span>
@@ -69,7 +67,7 @@ export default function MovieDetailsPage() {
           {/* Постер та кнопка трейлера */}
           <div className="w-full md:w-1/3 space-y-4">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-              {movie.ageRestriction && movie.ageRestriction !== 0 && (
+              {movie.ageRestriction && movie.ageRestriction !== 0 && movie.ageRestriction !== "0" && (
                 <span className="absolute top-3 right-3 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-md font-semibold border border-gray-700">
                   {movie.ageRestriction}
                 </span>
@@ -92,8 +90,10 @@ export default function MovieDetailsPage() {
           {/* Інформація про фільм */}
           <div className="w-full md:w-2/3 space-y-6">
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">{movie.title}</h1>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-12 text-sm border-y border-gray-800 py-5">
-              {movie.ageRestriction && movie.ageRestriction !== 0 && (
+            
+            {/* Сітка характеристик */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-12 text-sm border-y border-gray-800 py-5">
+              {movie.ageRestriction && movie.ageRestriction !== 0 && movie.ageRestriction !== "0" && (
                 <div className="flex justify-between sm:justify-start sm:gap-16">
                   <span className="text-gray-400">Вікові обмеження</span>
                   <span className="text-white font-medium">{movie.ageRestriction}</span>
@@ -123,7 +123,7 @@ export default function MovieDetailsPage() {
                   <span className="text-white font-medium">{genresText}</span>
                 </div>
               )}
-              {movie.duration && (
+              {movie.duration && movie.duration !== 0 && (
                 <div className="flex justify-between sm:justify-start sm:gap-16">
                   <span className="text-gray-400">Тривалість</span>
                   <span className="text-white font-medium">{movie.duration} хв</span>
@@ -149,10 +149,10 @@ export default function MovieDetailsPage() {
             <label className="text-sm font-medium text-gray-400 block">Виберіть дату</label>
             <div className="flex flex-wrap gap-3">
               {[
-                { day: "12", label: "Сьогодні, 12 вересня" },
-                { day: "13", label: "Завтра, 13 вересня" },
-                { day: "14", label: "Пн, 14 вересня" },
-                { day: "15", label: "Вт, 15 вересня" },
+                { day: "12", label: "Сьогодні, 12 листопада" },
+                { day: "13", label: "Завтра, 13 листопада" },
+                { day: "14", label: "Пн, 14 листопада" },
+                { day: "15", label: "Вт, 15 листопада" },
               ].map((item) => (
                 <button
                   key={item.day}
@@ -200,5 +200,13 @@ export default function MovieDetailsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function MovieDetailsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1117] text-white text-center py-20">Завантаження...</div>}>
+      <MovieDetailsContent />
+    </Suspense>
   );
 }
