@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { movies } from "../../../moviesData";
 
-export default function SeatSelection() {
+function SeatSelectionContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -15,8 +15,7 @@ export default function SeatSelection() {
   const movieId = Number(params.id);
   const movie = movies.find((m) => m.id === movieId) || movies[0];
 
-  // Зчитуємо дату і час із параметрів URL (або ставимо за замовчуванням)
-  const selectedDate = searchParams.get("date") || "14 вересня";
+  const selectedDate = searchParams.get("date") || "14 листопада";
   const selectedTime = searchParams.get("time") || "18:15";
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -158,7 +157,6 @@ export default function SeatSelection() {
               </p>
             </div>
 
-            {/* Чиста кнопка без обгортки Link */}
             <button
               onClick={handleGoToPayment}
               disabled={selectedSeats.length === 0}
@@ -174,5 +172,13 @@ export default function SeatSelection() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function SeatSelection() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] text-white text-center py-20">Завантаження...</div>}>
+      <SeatSelectionContent />
+    </Suspense>
   );
 }
