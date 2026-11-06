@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import HeroBanner from "@/components/HeroBanner";
+import DateFilter from "@/components/DateFilter";
 import MovieCard from "@/components/MovieCard";
 
 export interface Movie {
@@ -31,13 +33,23 @@ export default function HomePage() {
       });
   }, []);
 
+  const featuredMovie = movies[0];
+
   return (
     <div className="min-h-screen bg-[#0d1117] text-white">
-      {/* Твоя класна шапка */}
       <Navbar />
 
-      <main className="container mx-auto px-8 py-8">
-        <h1 className="text-2xl font-bold mb-6">Зараз у кіно</h1>
+      <main className="container mx-auto px-8 py-8 space-y-8">
+        {featuredMovie && <HeroBanner movie={featuredMovie} />}
+
+        <DateFilter />
+
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold mb-0">Зараз у кіно</h1>
+          <button className="text-red-500 hover:text-red-400 text-sm font-medium">
+            Дивитися всі →
+          </button>
+        </div>
         
         {loading ? (
           <div className="text-center py-20 text-gray-400">Завантаження фільмів з сервера...</div>
