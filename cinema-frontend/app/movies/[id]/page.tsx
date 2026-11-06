@@ -49,12 +49,28 @@ function MovieDetailsContent() {
 
   const genresText = Array.isArray(movie.genres) ? movie.genres.join(", ") : movie.genres;
 
+
+  const isValidAge = 
+    movie.ageRestriction !== undefined && 
+    movie.ageRestriction !== null && 
+    movie.ageRestriction !== 0 && 
+    movie.ageRestriction !== "" && 
+    String(movie.ageRestriction).trim() !== "" &&
+    String(movie.ageRestriction).trim() !== "";
+
+  const isValidYear = 
+    movie.year !== undefined && 
+    movie.year !== null && 
+    movie.year !== 0 && 
+    String(movie.year).trim() !== "" &&
+    String(movie.year).trim() !== "0";
+
   return (
     <div className="min-h-screen bg-[#0d1117] text-white">
       <Navbar />
       
       <main className="container mx-auto px-8 py-8 space-y-8">
-        
+       
         <div className="text-xs text-gray-400 flex items-center gap-2">
           <Link href="/" className="hover:text-white transition">КіноКлік</Link>
           <span>›</span>
@@ -63,11 +79,12 @@ function MovieDetailsContent() {
           <span className="text-white">{movie.title}</span>
         </div>
 
+        {/* Головний блок */}
         <div className="flex flex-col md:flex-row gap-8 items-start">
           {/* Постер та кнопка трейлера */}
           <div className="w-full md:w-1/3 space-y-4">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-              {movie.ageRestriction && movie.ageRestriction !== 0 && movie.ageRestriction !== "0" && (
+              {isValidAge && (
                 <span className="absolute top-3 right-3 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-md font-semibold border border-gray-700">
                   {movie.ageRestriction}
                 </span>
@@ -91,47 +108,47 @@ function MovieDetailsContent() {
           <div className="w-full md:w-2/3 space-y-6">
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">{movie.title}</h1>
             
-            {/* Сітка характеристик */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-12 text-sm border-y border-gray-800 py-5">
-              {movie.ageRestriction && movie.ageRestriction !== 0 && movie.ageRestriction !== "0" && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Вікові обмеження</span>
+            {/* Характеристики в один стовпчик */}
+            <div className="flex flex-col space-y-3 text-sm border-y border-gray-800 py-5">
+              {isValidAge && (
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Вікові обмеження</span>
                   <span className="text-white font-medium">{movie.ageRestriction}</span>
                 </div>
               )}
-              {movie.year && movie.year !== 0 && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Рік</span>
+              {isValidYear && (
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Рік</span>
                   <span className="text-white font-medium">{movie.year}</span>
                 </div>
               )}
               {movie.director && movie.director !== "" && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Режисер</span>
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Режисер</span>
                   <span className="text-white font-medium">{movie.director}</span>
                 </div>
               )}
               {movie.language && movie.language !== "" && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Мова</span>
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Мова</span>
                   <span className="text-white font-medium">{movie.language}</span>
                 </div>
               )}
               {genresText && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Жанр</span>
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Жанр</span>
                   <span className="text-white font-medium">{genresText}</span>
                 </div>
               )}
               {movie.duration && movie.duration !== 0 && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Тривалість</span>
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Тривалість</span>
                   <span className="text-white font-medium">{movie.duration} хв</span>
                 </div>
               )}
               {movie.production && movie.production !== "" && (
-                <div className="flex justify-between sm:justify-start sm:gap-16">
-                  <span className="text-gray-400">Виробництво</span>
+                <div className="flex justify-between sm:justify-start sm:gap-24">
+                  <span className="text-gray-400 w-32">Виробництво</span>
                   <span className="text-white font-medium">{movie.production}</span>
                 </div>
               )}
@@ -191,7 +208,7 @@ function MovieDetailsContent() {
 
           <div className="pt-4 border-t border-gray-800 flex justify-end">
             <Link
-              href={`/seats?movieId=${movie.id}&date=${selectedDate}&time=${selectedTime}`}
+              href={`/movies/${movieId}/seats?date=${selectedDate}&time=${selectedTime}`}
               className="w-full md:w-auto bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-xl font-bold transition text-center shadow-lg shadow-red-600/25"
             >
               Забронювати

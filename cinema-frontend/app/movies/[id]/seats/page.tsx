@@ -1,38 +1,69 @@
 "use client";
 
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { movies } from "../../../moviesData";
 
 function SeatSelectionContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
 
-  // Зчитуємо ID фільму
-  const movieId = Number(params.id);
-  const movie = movies.find((m) => m.id === movieId) || movies[0];
+  const movieId = params.id;
 
-  const selectedDate = searchParams.get("date") || "14 листопада";
-  const selectedTime = searchParams.get("time") || "18:15";
-
+  const [movie, setMovie] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
-  const ticketPrice = movie.price; // Беремо ціну напряму з об'єкта фільму
+  const [busySeats, setBusySeats] = useState<string[]>(["4-9", "4-10"]);
 
-  // Функція переходу до оплати
+  const selectedDate = searchParams.get("date") || "12";
+  const selectedTime = searchParams.get("time") || "17:15";
+
+  useEffect(() => {
+    if (!movieId) return;
+
+    fetch(`https://kinoklick-backend.onrender.com/movies/${movieId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setMovie(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Помилка завантаження фільму:", err);
+        setLoading(false);
+      });
+  }, [movieId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0b0e14] text-white">
+        <Navbar />
+        <div className="text-center py-20 text-gray-400">Завантаження схеми залу...</div>
+      </div>
+    );
+  }
+
+  if (!movie) {
+    return (
+      <div className="min-h-screen bg-[#0b0e14] text-white">
+        <Navbar />
+        <div className="text-center py-20 text-red-500">Фільм не знайдено</div>
+      </div>
+    );
+  }
+
+  const ticketPrice = movie?.price || 150;
+
   const handleGoToPayment = () => {
     if (selectedSeats.length === 0) return;
     const total = selectedSeats.length * ticketPrice;
 
-    // Передаємо динамічні дані (місця, суму, дату, час) на сторінку оплати
     router.push(
       `/movies/${movieId}/payment?seats=${selectedSeats.join(",")}&total=${total}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`
     );
   };
 
-  // Функція кліку на місце
   const toggleSeat = (row: number, seat: number) => {
     const seatId = `${row}-${seat}`;
     if (selectedSeats.includes(seatId)) {
@@ -47,7 +78,6 @@ function SeatSelectionContent() {
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {/* Динамічний заголовок фільму */}
         <div className="flex items-center gap-4">
           <Link
             href={`/movies/${movieId}`}
@@ -56,14 +86,13 @@ function SeatSelectionContent() {
             ←
           </Link>
           <div>
-            <h1 className="text-xl font-bold">{movie.title}</h1>
+            <h1 className="text-xl font-bold">{movie?.title}</h1>
             <p className="text-xs text-gray-400">
-              {selectedDate}, {selectedTime} • Зал 1
+              {selectedDate} листопада, {selectedTime} • Зал 1
             </p>
           </div>
         </div>
 
-        {/* Екран кінотеатру */}
         <div className="flex flex-col items-center justify-center space-y-4 py-6 bg-[#121621] rounded-3xl border border-gray-800">
           <div className="w-3/4 h-3 bg-red-600/60 rounded-full blur-sm shadow-[0_0_20px_rgba(239,68,68,0.5)]"></div>
           <span className="text-xs text-gray-400 tracking-widest uppercase">
@@ -71,7 +100,6 @@ function SeatSelectionContent() {
           </span>
         </div>
 
-        {/* Схема місць */}
         <div className="bg-[#121621] border border-gray-800 rounded-3xl p-8 flex flex-col items-center gap-3">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((row) => (
             <div key={row} className="flex items-center gap-2">
@@ -82,8 +110,7 @@ function SeatSelectionContent() {
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((seat) => {
                   const seatId = `${row}-${seat}`;
                   const isSelected = selectedSeats.includes(seatId);
-                  const isBusy =
-                    (row === 4 && seat === 9) || (row === 4 && seat === 10);
+                  const isBusy = busySeats.includes(seatId);
 
                   return (
                     <button
@@ -122,13 +149,12 @@ function SeatSelectionContent() {
           </div>
         </div>
 
-        {/* Нижня панель підсумків */}
         <div className="bg-[#121621] border border-gray-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <p className="text-xs text-gray-400">
               ОБРАНІ МІСЦЯ ({selectedSeats.length})
             </p>
-            <div className="flex gap-2 mt-1">
+            <div className="flex gap-2 mt-1 flex-wrap">
               {selectedSeats.length > 0 ? (
                 selectedSeats.map((s, i) => {
                   const [r, seatNum] = s.split("-");

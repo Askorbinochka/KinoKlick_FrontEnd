@@ -1,31 +1,44 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { movies } from "../../../moviesData";
 
 function PaymentContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   
-  // Отримуємо ID фільму з URL
-  const movieId = Number(params.id);
-  const movie = movies.find((m) => m.id === movieId) || movies[0];
+  const movieId = params.id;
 
-  // Зчитуємо динамічні параметри з посилання (місця, суму, дату та час)
+  const [movie, setMovie] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   const seatsParam = searchParams.get("seats") || "";
-  const totalParam = searchParams.get("total") || String(movie.price);
-  const selectedDate = searchParams.get("date") || "14 листопада";
-  const selectedTime = searchParams.get("time") || "18:15";
+  const totalParam = searchParams.get("total") || "150";
+  const selectedDate = searchParams.get("date") || "12";
+  const selectedTime = searchParams.get("time") || "17:15";
+
+  useEffect(() => {
+    if (!movieId) return;
+
+    fetch(`https://kinoklick-backend.onrender.com/movies/${movieId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setMovie(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Помилка завантаження фільму:", err);
+        setLoading(false);
+      });
+  }, [movieId]);
 
   const totalPrice = Number(totalParam);
   const seatsList = seatsParam ? seatsParam.split(",") : [];
   const ticketCount = seatsList.length > 0 ? seatsList.length : 1;
-  const ticketPrice = movie.price;
+  const ticketPrice = movie?.price || (totalPrice / ticketCount);
 
-  // Форматуємо місця для красивого виведення
   const formattedSeats = seatsList.length > 0 
     ? seatsList.map(s => {
         const [row, seat] = s.split("-");
@@ -45,15 +58,22 @@ function PaymentContent() {
     setIsPaid(true);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0b0e14] text-white">
+        <Navbar />
+        <div className="text-center py-20 text-gray-400">Завантаження сторінки оплати...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0b0e14] text-white">
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         {!isPaid ? (
-          /* ЕТАП 1: Форма оплати */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
             <div className="lg:col-span-7 bg-[#121621] border border-gray-800 rounded-3xl p-6 md:p-8 space-y-6">
               <div>
                 <h1 className="text-2xl font-bold text-white">Оформлення замовлення</h1>
@@ -61,7 +81,6 @@ function PaymentContent() {
               </div>
 
               <form onSubmit={handlePayment} className="space-y-6">
-                {/* Спосіб оплати */}
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Спосіб оплати</label>
                   <div className="grid grid-cols-3 gap-3">
@@ -77,7 +96,6 @@ function PaymentContent() {
                   </div>
                 </div>
 
-                {/* Поля картки */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">ІМ'Я ВЛАСНИКА КАРТКИ</label>
@@ -130,7 +148,6 @@ function PaymentContent() {
                   </div>
                 </div>
 
-                {/* Контактні дані */}
                 <div className="space-y-4 pt-2 border-t border-gray-800">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Контактні дані</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,20 +185,19 @@ function PaymentContent() {
               </form>
             </div>
 
-            {/* Права колонка: Динамічний чек замовлення */}
             <div className="lg:col-span-5">
               <div className="bg-[#121621] border border-gray-800 rounded-3xl p-6 space-y-6 sticky top-6">
                 <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-900 border border-gray-800">
                   <img 
-                    src={movie.image} 
-                    alt={movie.title} 
+                    src={movie?.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"} 
+                    alt={movie?.title} 
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">{movie.title}</h2>
+                  <h2 className="text-xl font-bold">{movie?.title}</h2>
                   <p className="text-xs text-red-500 font-medium mt-1">
-                    Зал 3 • {selectedDate} {selectedTime} <br />
+                    Зал 1 • {selectedDate} листопада, {selectedTime} <br />
                     {formattedSeats}
                   </p>
                 </div>
@@ -201,7 +217,6 @@ function PaymentContent() {
             </div>
           </div>
         ) : (
-          /* ЕТАП 2: Успішна оплата та електронний квиток */
           <div className="max-w-xl mx-auto space-y-8 py-4">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-green-500/20 border border-green-500/40 text-green-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
@@ -215,18 +230,18 @@ function PaymentContent() {
               <div className="flex justify-between items-start border-b border-gray-800 pb-4">
                 <div>
                   <span className="text-xs font-bold tracking-widest text-red-500 uppercase">КіноКлік</span>
-                  <h2 className="text-2xl font-extrabold mt-1">{movie.title}</h2>
-                  <p className="text-xs text-gray-400">Зал 3</p>
+                  <h2 className="text-2xl font-extrabold mt-1">{movie?.title}</h2>
+                  <p className="text-xs text-gray-400">Зал 1</p>
                 </div>
                 <span className="bg-red-600/20 text-red-400 border border-red-500/30 text-xs px-2.5 py-1 rounded-md font-semibold">
-                  IMAX 3D
+                  IMAX Laser
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-gray-400">ДАТА</p>
-                  <p className="font-semibold mt-0.5">{selectedDate}</p>
+                  <p className="font-semibold mt-0.5">{selectedDate} листопада</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">ЧАС</p>
