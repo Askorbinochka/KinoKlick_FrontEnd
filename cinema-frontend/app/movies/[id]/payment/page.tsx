@@ -1,123 +1,158 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { API_URL } from "@/app/api";
 
-const API_URL = "https://kinoklick-backend.onrender.com";
+type Ticket = {
+  id: string;
+  price: number;
+  qrCode: string;
+  qrCodeImage?: string;
+};
+
+type Confirmation = {
+  order?: {
+    id: string;
+    totalAmount: number;
+    status: string;
+    customerName: string;
+  };
+  tickets?: Ticket[];
+};
 
 function PaymentContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const movieId = params.id;
 
-  const sessionId = searchParams.get("sessionId");
+  const bookingId = searchParams.get("bookingId") || "";
+  const sessionId = searchParams.get("sessionId") || "";
+  const demoMode = searchParams.get("demo") === "1";
   const seatsParam = searchParams.get("seats") || "";
-  const totalParam = searchParams.get("total") || "150";
+  const totalPrice = Number(searchParams.get("total") || 0);
   const selectedDate = searchParams.get("date") || "";
   const selectedTime = searchParams.get("time") || "";
+  const expiresAt = searchParams.get("expiresAt") || "";
+  const seatLabels = seatsParam
+    .split(",")
+    .filter(Boolean)
+    .map((seat) => {
+      const [row, number] = seat.split("-");
+      return `${row} ряд, ${number} місце`;
+    });
 
-  const [movie, setMovie] = useState<any>(null);
+  const [movie, setMovie] = useState<{ title?: string; posterUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [bookingId, setBookingId] = useState<string | null>(null);
-  const [ticketData, setTicketData] = useState<any>(null);
-
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [isPaid, setIsPaid] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [demoScenario, setDemoScenario] = useState<"success" | "declined">("success");
+  const [showExpiredDemo, setShowExpiredDemo] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [ticketData, setTicketData] = useState<Confirmation | null>(null);
+  const [error, setError] = useState("");
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!movieId) return;
+    if (!movieId) {
+      setLoading(false);
+      return;
+    }
 
     fetch(`${API_URL}/movies/${movieId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setMovie(data);
-        setLoading(false);
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Не вдалося завантажити інформацію про фільм.");
+        return res.json();
       })
+      .then((data) => setMovie(data))
       .catch((err) => {
         console.error("Помилка завантаження фільму:", err);
-        setLoading(false);
-      });
+        setError(err instanceof Error ? err.message : "Не вдалося завантажити фільм.");
+      })
+      .finally(() => setLoading(false));
   }, [movieId]);
 
-  const totalPrice = Number(totalParam);
-  const seatsList = seatsParam ? seatsParam.split(",") : [];
-  const ticketCount = seatsList.length > 0 ? seatsList.length : 1;
-  const ticketPrice = totalPrice / ticketCount;
+  useEffect(() => {
+    if (!expiresAt) return;
 
-  const formattedSeats = seatsList.length > 0 
-    ? seatsList.map(s => {
-        const [row, seat] = s.split("-");
-        return `${row} ряд, ${seat} місце`;
-      }).join(", ")
-    : "Місця не вибрано";
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+    };
 
-  // Крок 1: Тимчасове бронювання місць при завантаженні або кліку
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
+  const handleConfirm = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!bookingId || confirming || secondsLeft === 0 || showExpiredDemo) return;
+
+    if (demoMode && demoScenario === "declined") {
+      setError("Демо: платіж відхилено. Бронювання залишається активним до завершення таймера.");
+      return;
+    }
+
+    setConfirming(true);
+    setError("");
 
     try {
-      // 1. Надсилаємо запит на тимчасову бронь (/tickets/book)
-      const formattedSeatsForBackend = seatsList.map(s => {
-        const [row, seat] = s.split("-");
-        return { row: Number(row), seat: Number(seat) };
-      });
-
-      const bookRes = await fetch(`${API_URL}/tickets/book`, {
+      const response = await fetch(`${API_URL}/tickets/confirm/${encodeURIComponent(bookingId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionId || "default-session",
-          seats: formattedSeatsForBackend,
-          email,
-          phone
-        }),
+        body: JSON.stringify({ customerName, customerEmail, customerPhone }),
       });
+      const data = await response.json().catch(() => ({}));
 
-      const bookData = await bookRes.json();
-      const currentBookingId = bookData.bookingId || bookData.id || "mock-booking-id";
-      setBookingId(currentBookingId);
+      if (!response.ok) {
+        const message = Array.isArray(data.message) ? data.message.join(" ") : data.message;
+        throw new Error(message || "Не вдалося підтвердити бронювання. Перевірте дані та спробуйте ще раз.");
+      }
 
-      // 2. Підтвердження оплати (/tickets/confirm/{bookingId})
-      const confirmRes = await fetch(`${API_URL}/tickets/confirm/${currentBookingId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cardName,
-          cardNumber,
-          expiry,
-          cvv,
-          email,
-          phone,
-          amount: totalPrice
-        }),
-      });
-
-      const confirmData = await confirmRes.json();
-      setTicketData(confirmData);
-      setIsPaid(true);
+      setTicketData(data);
+      setConfirmed(true);
     } catch (err) {
-      console.error("Помилка оплати/бронювання:", err);
-      // У разі тестового середовища без реального бекенда переводимо в успішний стан для демонстрації
-      setIsPaid(true);
+      console.error("Помилка підтвердження бронювання:", err);
+      setError(err instanceof Error ? err.message : "Не вдалося підтвердити бронювання.");
     } finally {
-      setSubmitting(false);
+      setConfirming(false);
     }
   };
+
+  const isExpired = secondsLeft === 0 || showExpiredDemo;
+  const countdownLabel = secondsLeft === null
+    ? null
+    : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0b0e14] text-white">
         <Navbar />
-        <div className="text-center py-20 text-gray-400">Завантаження сторінки оплати...</div>
+        <div className="text-center py-20 text-gray-400">Завантаження замовлення...</div>
+      </div>
+    );
+  }
+
+  if (!bookingId) {
+    return (
+      <div className="min-h-screen bg-[#0b0e14] text-white">
+        <Navbar />
+        <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-5">
+          <h1 className="text-2xl font-bold">Бронювання не знайдено</h1>
+          <p className="text-gray-400">Поверніться до вибору місць і створіть бронювання ще раз.</p>
+          <Link href={`/movies/${movieId}`} className="inline-block bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl font-semibold">
+            До вибору сеансу
+          </Link>
+        </main>
       </div>
     );
   }
@@ -126,210 +161,201 @@ function PaymentContent() {
     <div className="min-h-screen bg-[#0b0e14] text-white">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {!isPaid ? (
+      <main className="mx-auto max-w-[1160px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        {!confirmed ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-7 bg-[#121621] border border-gray-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="space-y-5 rounded-2xl border border-slate-800 bg-[#111722] p-5 md:p-7 lg:col-span-7">
               <div>
-                <h1 className="text-2xl font-bold text-white">Оформлення замовлення</h1>
-                <p className="text-xs text-gray-400 mt-1">Будь ласка, вкажіть реквізити для оплати та завершення бронювання.</p>
+                <h1 className="text-2xl font-bold">Підтвердження бронювання</h1>
+                <p className="text-sm text-gray-400 mt-2">
+                  Вкажіть контактні дані для оформлення замовлення та електронних квитків.
+                </p>
               </div>
 
-              <form onSubmit={handlePayment} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Спосіб оплати</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button type="button" className="py-3 rounded-xl border border-gray-800 bg-[#181f2d] text-sm font-medium hover:border-gray-600 transition">Apple Pay</button>
-                    <button type="button" className="py-3 rounded-xl border border-red-600 bg-[#181f2d] text-sm font-medium text-white shadow-lg shadow-red-600/20">Картка</button>
-                    <button type="button" className="py-3 rounded-xl border border-gray-800 bg-[#181f2d] text-sm font-medium hover:border-gray-600 transition">Google Pay</button>
-                  </div>
+              {countdownLabel && (
+                <div className={`rounded-xl border px-4 py-3 text-sm ${secondsLeft === 0 ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-amber-500/30 bg-amber-500/10 text-amber-200"}`}>
+                  {secondsLeft === 0
+                    ? "Час бронювання минув. Поверніться до вибору місць і забронюйте їх знову."
+                    : `Місця утримуються ще ${countdownLabel}.`}
                 </div>
+              )}
 
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-400">Спосіб оплати</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ["apple", "Apple Pay"],
+                    ["card", "Картка"],
+                    ["google", "Google Pay"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setPaymentMethod(value)}
+                      aria-pressed={paymentMethod === value}
+                      className={`rounded-lg border px-2 py-3 text-xs transition ${paymentMethod === value ? "border-red-500 bg-red-500/10 text-white" : "border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirm} className="space-y-4">
+
+              {paymentMethod === "card" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">ІМ'Я ВЛАСНИКА КАРТКИ</label>
-                    <input 
-                      type="text" 
-                      placeholder="наприклад, Тетяна Малецька" 
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      required
-                      className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                    />
+                    <label htmlFor="card-holder" className="mb-1 block text-xs text-slate-400">ІМ’Я ВЛАСНИКА КАРТКИ</label>
+                    <input id="card-holder" type="text" autoComplete="cc-name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                   </div>
-
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">НОМЕР КАРТКИ</label>
-                    <input 
-                      type="text" 
-                      placeholder="•••• •••• •••• 4321" 
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      required
-                      maxLength={19}
-                      className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                    />
+                    <label htmlFor="card-number" className="mb-1 block text-xs text-slate-400">НОМЕР КАРТКИ</label>
+                    <input id="card-number" type="text" inputMode="numeric" autoComplete="cc-number" placeholder="•••• •••• •••• 4321" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} required maxLength={19} pattern="[0-9 ]{13,19}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">ТЕРМІН ДІЇ</label>
-                      <input 
-                        type="text" 
-                        placeholder="MM/YY" 
-                        value={expiry}
-                        onChange={(e) => setExpiry(e.target.value)}
-                        required
-                        maxLength={5}
-                        className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                      />
+                      <label htmlFor="card-expiry" className="mb-1 block text-xs text-slate-400">ТЕРМІН ДІЇ</label>
+                      <input id="card-expiry" type="text" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={cardExpiry} onChange={(event) => setCardExpiry(event.target.value)} required maxLength={5} pattern="(0[1-9]|1[0-2])/[0-9]{2}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">CVV</label>
-                      <input 
-                        type="password" 
-                        placeholder="•••" 
-                        value={cvv}
-                        onChange={(e) => setCvv(e.target.value)}
-                        required
-                        maxLength={4}
-                        className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                      />
+                      <label htmlFor="card-cvv" className="mb-1 block text-xs text-slate-400">CVV</label>
+                      <input id="card-cvv" type="password" inputMode="numeric" autoComplete="cc-csc" placeholder="•••" value={cardCvv} onChange={(event) => setCardCvv(event.target.value)} required maxLength={4} pattern="[0-9]{3,4}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                     </div>
                   </div>
                 </div>
+              )}
 
-                <div className="space-y-4 pt-2 border-t border-gray-800">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Контактні дані</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">EMAIL</label>
-                      <input 
-                        type="email" 
-                        placeholder="example@gmail.com" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">НОМЕР ТЕЛЕФОНУ</label>
-                      <input 
-                        type="tel" 
-                        placeholder="+380 (555) 987-65-43" 
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        required
-                        className="w-full bg-[#181f2d] border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-600 transition"
-                      />
-                    </div>
-                  </div>
+              {paymentMethod !== "card" && (
+                <div>
+                  <label htmlFor="customer-name" className="mb-1 block text-xs text-slate-400">ІМ’Я ТА ПРІЗВИЩЕ</label>
+                  <input id="customer-name" type="text" autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
+                </div>
+              )}
+
+              {demoMode && (
+                <div className="flex flex-wrap gap-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                  <button type="button" onClick={() => { setDemoScenario("success"); setError(""); setShowExpiredDemo(false); }} className={`rounded-lg px-3 py-2 text-[10px] ${demoScenario === "success" ? "bg-emerald-500/20 text-emerald-200" : "bg-slate-800 text-slate-400"}`}>Успішна оплата</button>
+                  <button type="button" onClick={() => { setDemoScenario("declined"); setError(""); setShowExpiredDemo(false); }} className={`rounded-lg px-3 py-2 text-[10px] ${demoScenario === "declined" ? "bg-red-500/20 text-red-200" : "bg-slate-800 text-slate-400"}`}>Відхилена оплата</button>
+                  <button type="button" onClick={() => setShowExpiredDemo(true)} className="rounded-lg bg-slate-800 px-3 py-2 text-[10px] text-slate-400 hover:text-white">Час вийшов</button>
+                </div>
+              )}
+
+                <div>
+                  <label htmlFor="customer-email" className="mb-1 block text-xs text-slate-400">EMAIL</label>
+                  <input
+                    id="customer-email"
+                    type="email"
+                    autoComplete="email"
+                    value={customerEmail}
+                    onChange={(event) => setCustomerEmail(event.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="customer-phone" className="mb-1 block text-xs text-slate-400">НОМЕР ТЕЛЕФОНУ</label>
+                  <input
+                    id="customer-phone"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="+380501234567"
+                    value={customerPhone}
+                    onChange={(event) => setCustomerPhone(event.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
+                  />
                 </div>
 
-                <button 
-                  type="submit" 
-                  disabled={submitting}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-600/30 text-center text-base cursor-pointer"
+                {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+
+                <button
+                  type="submit"
+                  disabled={confirming || isExpired}
+                  className="w-full rounded-xl bg-red-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-400"
                 >
-                  {submitting ? "Обробка платежу..." : `СПЛАТИТИ • ${totalPrice} ГРН`}
+                  {confirming ? "Обробляємо…" : demoMode && demoScenario === "declined" ? "ОПЛАТУ ВІДХИЛЕНО" : `СПЛАТИТИ • ${totalPrice} ГРН`}
                 </button>
               </form>
             </div>
 
-            <div className="lg:col-span-5">
-              <div className="bg-[#121621] border border-gray-800 rounded-3xl p-6 space-y-6 sticky top-6">
-                <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-900 border border-gray-800">
-                  <img 
-                    src={movie?.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"} 
-                    alt={movie?.title} 
-                    className="w-full h-full object-cover"
-                  />
+            <aside className="lg:col-span-5">
+              <div className="sticky top-16 space-y-4 rounded-2xl border border-slate-800 bg-[#111722] p-5">
+                <div className="aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+                  {movie?.posterUrl && <img src={movie.posterUrl} alt={movie.title || "Постер фільму"} className="w-full h-full object-cover" />}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">{movie?.title}</h2>
-                  <p className="text-xs text-red-500 font-medium mt-1">
-                    Зал 1 • {selectedDate}, {selectedTime} <br />
-                    {formattedSeats}
-                  </p>
+                  <h2 className="text-xl font-bold">{movie?.title || "Ваше замовлення"}</h2>
+                  <p className="text-sm text-red-400 mt-2">{selectedDate}{selectedTime ? ` • ${selectedTime}` : ""}</p>
+                  <p className="text-sm text-gray-300 mt-2">{seatLabels.length ? seatLabels.join(", ") : "Місця обрано"}</p>
                 </div>
-
-                <div className="border-t border-b border-gray-800 py-4 space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-400">
-                    <span>Квитки ({ticketCount}x {ticketPrice} грн)</span>
-                    <span className="text-white">{totalPrice} грн</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Разом до сплати</span>
-                  <span className="text-red-500 text-2xl">{totalPrice} грн</span>
+                <div className="border-t border-gray-800 pt-4 flex justify-between items-center">
+                  <span className="text-gray-400">{seatLabels.length || 1} квитки</span>
+                  <span className="text-xl font-bold">{totalPrice} грн</span>
                 </div>
               </div>
-            </div>
+            </aside>
           </div>
         ) : (
-          <div className="max-w-xl mx-auto space-y-8 py-4">
+          <div className="max-w-2xl mx-auto space-y-6 py-4">
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-green-500/20 border border-green-500/40 text-green-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
-                ✓
-              </div>
+              <div className="w-16 h-16 bg-green-500/20 border border-green-500/40 text-green-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
               <h1 className="text-2xl font-bold">Оплата пройшла успішно!</h1>
-              <p className="text-xs text-gray-400">Ваше бронювання підтверджено. Електронний квиток надіслано на вашу пошту.</p>
+              <p className="text-sm text-gray-400">Квитки сформовано. Збережіть QR-коди або покажіть їх під час входу.</p>
+              <p className="text-sm text-gray-400">Email для замовлення: <span className="text-white">{customerEmail}</span></p>
+      
             </div>
 
-            <div className="bg-[#121621] border border-gray-800 rounded-3xl p-6 md:p-8 space-y-6 relative overflow-hidden shadow-2xl">
-              <div className="flex justify-between items-start border-b border-gray-800 pb-4">
-                <div>
-                  <span className="text-xs font-bold tracking-widest text-red-500 uppercase">КіноКлік</span>
-                  <h2 className="text-2xl font-extrabold mt-1">{movie?.title}</h2>
-                  <p className="text-xs text-gray-400">Зал 1</p>
+            {ticketData?.tickets?.length ? ticketData.tickets.map((ticket) => (
+              <article key={ticket.id} className="bg-[#121621] border border-gray-800 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-40 h-40 shrink-0 bg-white rounded-2xl p-2 flex items-center justify-center">
+                  {ticket.qrCodeImage ? (
+                    <img src={ticket.qrCodeImage} alt={`QR-код квитка ${ticket.id}`} className="w-full h-full object-contain" />
+                  ) : (
+                    <p className="text-black text-xs break-all text-center">{ticket.qrCode}</p>
+                  )}
                 </div>
-                <span className="bg-red-600/20 text-red-400 border border-red-500/30 text-xs px-2.5 py-1 rounded-md font-semibold">
-                  IMAX Laser
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-gray-400">ДАТА</p>
-                  <p className="font-semibold mt-0.5">{selectedDate}</p>
+                <div className="text-center sm:text-left space-y-2">
+                  <p className="text-xs font-bold tracking-widest text-red-500 uppercase">КіноКлік • Електронний квиток</p>
+                  <h2 className="text-xl font-bold">{movie?.title || "Квиток"}</h2>
+                  <p className="text-sm text-gray-300">{selectedDate}{selectedTime ? ` • ${selectedTime}` : ""}</p>
+                  <p className="text-sm text-gray-300">{seatLabels.join(", ")}</p>
+                  <p className="text-sm text-gray-400">{ticket.price} грн</p>
+                  <p className="text-xs text-gray-500 break-all">Код квитка: {ticket.qrCode}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400">ЧАС</p>
-                  <p className="font-semibold mt-0.5">{selectedTime}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">МІСЦЯ</p>
-                  <p className="font-semibold text-red-400 mt-0.5">{formattedSeats}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">ТАРИФ</p>
-                  <p className="font-semibold mt-0.5">Дорослий ({ticketCount} шт)</p>
-                </div>
-              </div>
-
-              <div className="border-t border-dashed border-gray-800 pt-6 flex flex-col items-center justify-center space-y-3">
-                <div className="bg-white p-4 rounded-2xl">
-                  <div className="w-32 h-32 bg-black flex items-center justify-center text-white text-xs text-center font-mono rounded">
-                    [QR CODE]
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 text-center tracking-wide">СКАНУЙТЕ ПРИ ВХОДІ до ЗАЛИ</p>
-                <p className="text-[10px] text-gray-600 font-mono">РЕФ: {ticketData?.ref || "KKL-20261114-0938"}</p>
-              </div>
-            </div>
+              </article>
+            )) : (
+              <p role="alert" className="text-center text-amber-200">Замовлення підтверджене, але бекенд не повернув список квитків.</p>
+            )}
 
             <div className="text-center">
-              <Link href="/">
-                <button className="bg-[#181f2d] hover:bg-gray-800 text-white font-medium px-8 py-3.5 rounded-xl transition border border-gray-800 text-sm cursor-pointer">
-                  ← Повернутися на головну
-                </button>
+              <Link href="/" className="inline-block bg-[#181f2d] hover:bg-gray-800 px-8 py-3.5 rounded-xl border border-gray-800 text-sm font-medium">
+                ← Повернутися на головну
               </Link>
             </div>
           </div>
         )}
       </main>
+
+      {isExpired && !confirmed && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="booking-expired-title" className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-[#111722] p-5 shadow-2xl">
+            <p className="font-mono text-3xl font-bold text-red-500">00:00</p>
+            <div>
+              <h2 id="booking-expired-title" className="text-base font-bold">Час бронювання вичерпано</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Місця більше не утримуються. Оберіть їх знову, щоб продовжити замовлення.</p>
+            </div>
+            <div className="grid gap-2">
+              <Link href={`/movies/${movieId}/seats?sessionId=${encodeURIComponent(sessionId)}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`} className="rounded-lg bg-red-600 px-4 py-2.5 text-center text-xs font-bold text-white hover:bg-red-500">
+                Обрати місця знову
+              </Link>
+              <Link href={`/movies/${movieId}`} className="rounded-lg bg-slate-800 px-4 py-2.5 text-center text-xs font-semibold text-slate-200 hover:bg-slate-700">
+                До фільму
+              </Link>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

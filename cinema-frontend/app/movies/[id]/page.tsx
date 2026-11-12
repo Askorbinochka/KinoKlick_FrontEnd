@@ -1,199 +1,239 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { API_URL } from "@/app/api";
 
-const API_URL = "https://kinoklick-backend.onrender.com";
+type Session = {
+  id: string;
+  startTime: string;
+  price?: number;
+  basePrice?: number;
+  ticketPrice?: number;
+  pricePerSeat?: number;
+  hall?: { name?: string };
+};
+
+function asSessions(data: unknown): Session[] {
+  if (Array.isArray(data)) return data as Session[];
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    for (const key of ["sessions", "items", "data"]) {
+      if (Array.isArray(record[key])) return record[key] as Session[];
+    }
+  }
+  return [];
+}
+
+function dateKey(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("uk-UA", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Kyiv",
+  });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString("uk-UA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Kyiv",
+  });
+}
 
 function MovieDetailsContent() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const movieId = params.id;
 
   const [movie, setMovie] = useState<any>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [error, setError] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
 
-  // 1. Завантаження даних про фільм та сеанси
   useEffect(() => {
     if (!movieId) return;
 
     Promise.all([
-      fetch(`${API_URL}/movies/${movieId}`).then((res) => res.json()),
-      fetch(`${API_URL}/sessions?movieId=${movieId}`).then((res) => res.json()),
+      fetch(`${API_URL}/movies/${movieId}`),
+      fetch(`${API_URL}/sessions?movieId=${encodeURIComponent(movieId)}`),
     ])
-      .then(([movieData, sessionsData]) => {
+      .then(async ([movieRes, sessionsRes]) => {
+        if (!movieRes.ok) throw new Error("Не вдалося завантажити інформацію про фільм.");
+        if (!sessionsRes.ok) throw new Error("Не вдалося завантажити розклад сеансів.");
+        const [movieData, sessionsData] = await Promise.all([movieRes.json(), sessionsRes.json()]);
         setMovie(movieData);
-        
-        // Фільтруємо сеанси саме для цього фільму
-        const movieSessions = Array.isArray(sessionsData) 
-          ? sessionsData.filter((s: any) => s.movieId === movieId || s.movie?.id === movieId)
-          : [];
-        
-        setSessions(movieSessions);
-
-        // Якщо є сеанси, за замовчуванням обираємо перший
-        if (movieSessions.length > 0) {
-          const first = movieSessions[0];
+        const relatedSessions = asSessions(sessionsData)
+          .filter((session: any) =>
+            (session.movieId === movieId || session.movie?.id === movieId) &&
+            new Date(session.startTime).getTime() >= Date.now()
+          );
+        setSessions(relatedSessions);
+        if (relatedSessions.length) {
+          const first = relatedSessions[0];
           setSelectedSessionId(first.id);
-          setSelectedDate(new Date(first.startTime).toLocaleDateString("uk-UA", { day: 'numeric', month: 'long' }));
-          setSelectedTime(new Date(first.startTime).toLocaleTimeString("uk-UA", { hour: '2-digit', minute: '2-digit' }));
+          setSelectedDate(dateKey(first.startTime));
         }
-        setLoading(false);
       })
       .catch((err) => {
-        console.error("Помилка завантаження даних:", err);
-        setLoading(false);
-      });
+        console.error("Помилка завантаження фільму та розкладу:", err);
+        setError(err instanceof Error ? err.message : "Не вдалося завантажити сторінку фільму.");
+      })
+      .finally(() => setLoading(false));
   }, [movieId]);
 
+  const availableDates = useMemo(() => {
+    const uniqueDates = [...new Set(sessions.map((session) => dateKey(session.startTime)))];
+    return uniqueDates.sort();
+  }, [sessions]);
+
+  const availableSessions = sessions
+    .filter((session) => dateKey(session.startTime) === selectedDate)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0d1117] text-white">
-        <Navbar />
-        <div className="text-center py-20 text-gray-400">Завантаження інформації...</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-[#0b0e14] text-white"><Navbar /><p className="py-20 text-center text-slate-400">Завантажуємо сторінку фільму…</p></div>;
   }
 
   if (!movie) {
-    return (
-      <div className="min-h-screen bg-[#0d1117] text-white">
-        <Navbar />
-        <div className="text-center py-20 text-red-500">Фільм не знайдено</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-[#0b0e14] text-white"><Navbar /><p role="alert" className="py-20 text-center text-red-300">{error || "Фільм не знайдено."}</p></div>;
   }
 
-  // Формуємо унікальні дати з startTime
-  const availableDates = Array.from(
-    new Set(
-      sessions.map((s) => 
-        new Date(s.startTime).toLocaleDateString("uk-UA", { day: 'numeric', month: 'long' })
-      )
-    )
-  );
-
-  // Доступний час для вибраної дати
-  const availableTimes = sessions
-    .filter((s) => {
-      const dateStr = new Date(s.startTime).toLocaleDateString("uk-UA", { day: 'numeric', month: 'long' });
-      return dateStr === selectedDate;
-    })
-    .map((s) => ({
-      sessionId: s.id,
-      time: new Date(s.startTime).toLocaleTimeString("uk-UA", { hour: '2-digit', minute: '2-digit' }),
-      price: s.price || 150,
-    }));
+  const genres = Array.isArray(movie.genres) ? movie.genres.join(", ") : movie.genres || movie.genre || "—";
+  const metadata = [
+    ["Вікове обмеження", movie.ageRating || movie.ageLimit || movie.ageRestriction],
+    ["Рік", movie.year || movie.releaseYear || (movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : null)],
+    ["Країна", movie.country],
+    ["Режисер", movie.director],
+    ["Жанр", genres],
+    ["Тривалість", movie.duration ? `${movie.duration} хв` : null],
+  ].filter(([, value]) => value);
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white">
+    <div className="min-h-screen bg-[#0b0e14] text-white">
       <Navbar />
-      
-      <main className="container mx-auto px-8 py-8 space-y-8">
-        <div className="text-xs text-gray-400 flex items-center gap-2">
-          <Link href="/" className="hover:text-white transition">КіноКлік</Link>
-          <span>›</span>
-          <span className="text-white">{movie.title}</span>
-        </div>
+      <main className="mx-auto w-full max-w-[1160px] space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Навігаційний ланцюжок">
+          <Link href="/" className="hover:text-white">Фільми</Link><span>/</span><span className="text-slate-200">{movie.title}</span>
+        </nav>
 
-        <div className="flex flex-col md:flex-row gap-8 items-start">
-          <div className="w-full md:w-1/3 space-y-4">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-              <img 
-                src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"} 
-                alt={movie.title}
-                className="w-full h-auto object-cover" 
-              />
-            </div>
+        <section className="grid gap-6 md:grid-cols-[260px_1fr] lg:gap-8">
+          <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+            <img
+              src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}
+              alt={`Постер фільму «${movie.title}»`}
+              className="aspect-[2/3] w-full object-cover"
+            />
+            {movie.trailerUrl && (
+              <a href={movie.trailerUrl} target="_blank" rel="noreferrer" className="block border-t border-slate-800 px-4 py-3 text-center text-xs text-slate-300 hover:text-white">
+                ▶ Дивитись трейлер
+              </a>
+            )}
           </div>
 
-          <div className="w-full md:w-2/3 space-y-6">
-            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">{movie.title}</h1>
-            <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-              {movie.description}
-            </p>
-          </div>
-        </div>
-
-        {/* Блок вибору дати та часу */}
-        <div className="bg-[#121721] border border-gray-800 rounded-2xl p-6 md:p-8 space-y-6">
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-400 block">Виберіть дату</label>
-            <div className="flex flex-wrap gap-3">
-              {availableDates.length > 0 ? (
-                availableDates.map((dateStr) => (
-                  <button
-                    key={dateStr}
-                    onClick={() => {
-                      setSelectedDate(dateStr);
-                      // Автоматично обираємо перший час для нової дати
-                      const firstForDate = sessions.find(
-                        (s) => new Date(s.startTime).toLocaleDateString("uk-UA", { day: 'numeric', month: 'long' }) === dateStr
-                      );
-                      if (firstForDate) {
-                        setSelectedSessionId(firstForDate.id);
-                        setSelectedTime(new Date(firstForDate.startTime).toLocaleTimeString("uk-UA", { hour: '2-digit', minute: '2-digit' }));
-                      }
-                    }}
-                    className={`px-5 py-3 rounded-xl text-sm font-medium transition border ${
-                      selectedDate === dateStr
-                        ? "bg-red-600 border-red-600 text-white shadow-lg shadow-red-600/20"
-                        : "bg-[#1a2230] border-gray-700/60 text-gray-300 hover:border-gray-500"
-                    }`}
-                  >
-                    {dateStr}
-                  </button>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">На жаль, на цей фільм наразі немає сеансів</p>
-              )}
-            </div>
-          </div>
-
-          {availableDates.length > 0 && (
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-400 block">Виберіть час</label>
-              <div className="flex flex-wrap gap-4">
-                {availableTimes.map((item, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setSelectedTime(item.time);
-                      setSelectedSessionId(item.sessionId);
-                    }}
-                    className={`px-6 py-3 rounded-xl text-sm font-medium transition border flex items-center gap-3 ${
-                      selectedTime === item.time
-                        ? "bg-red-600/10 border-red-600 text-white"
-                        : "bg-[#1a2230] border-gray-700/60 text-gray-300 hover:border-gray-500"
-                    }`}
-                  >
-                    <span className="font-bold">{item.time}</span>
-                    <span className="text-xs text-gray-400 border-l border-gray-700 pl-3">від {item.price} грн</span>
-                  </button>
-                ))}
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
+                {movie.ageRating && <span className="rounded bg-slate-800 px-2 py-1 text-slate-200">{movie.ageRating}</span>}
+                <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">{genres}</span>
               </div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{movie.title}</h1>
             </div>
-          )}
 
-          <div className="pt-4 border-t border-gray-800 flex justify-end">
-            <Link
-              href={`/movies/${movieId}/seats?sessionId=${selectedSessionId}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`}
-              className={`w-full md:w-auto px-10 py-4 rounded-xl font-bold transition text-center shadow-lg ${
-                selectedDate && selectedTime && selectedSessionId
-                  ? "bg-red-600 hover:bg-red-700 text-white shadow-red-600/25 cursor-pointer" 
-                  : "bg-gray-800 text-gray-500 cursor-not-allowed pointer-events-none"
-              }`}
-            >
-              Забронювати
-            </Link>
+            <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-3 border-y border-slate-800 py-4 text-xs sm:grid-cols-3">
+              {metadata.map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-slate-500">{label}</dt>
+                  <dd className="mt-1 font-medium text-slate-200">{value}</dd>
+                </div>
+              ))}
+              {movie.rating != null && <div><dt className="text-slate-500">Рейтинг</dt><dd className="mt-1 font-medium text-amber-400">★ {movie.rating}</dd></div>}
+            </dl>
+
+            <div className="max-w-3xl space-y-2">
+              <h2 className="text-sm font-semibold">Про фільм</h2>
+              <p className="text-xs leading-6 text-slate-400 sm:text-sm">{movie.description || "Опис фільму поки не додано."}</p>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-800 bg-[#111722] p-4 sm:p-6">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-bold">Оберіть сеанс</h2>
+              <p className="mt-1 text-xs text-slate-500">Доступні дата та час показу</p>
+            </div>
+
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            {availableDates.length ? (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {availableDates.map((date) => (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(date);
+                        const first = sessions.find((session) => dateKey(session.startTime) === date);
+                        if (first) setSelectedSessionId(first.id);
+                      }}
+                      aria-pressed={selectedDate === date}
+                      className={`rounded-lg border px-3 py-2 text-xs uppercase transition ${selectedDate === date ? "border-red-500 bg-red-600 text-white" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"}`}
+                    >
+                      {formatDate(sessions.find((session) => dateKey(session.startTime) === date)!.startTime)}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs text-slate-500">Час сеансу</p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => setSelectedSessionId(session.id)}
+                        aria-pressed={selectedSessionId === session.id}
+                        className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs transition ${selectedSessionId === session.id ? "border-red-500 bg-red-500/10 text-white" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"}`}
+                      >
+                        <span className="font-bold">{formatTime(session.startTime)}</span>
+                        <span className="border-l border-slate-700 pl-3 text-slate-400">{session.price ?? session.basePrice ?? session.ticketPrice ?? session.pricePerSeat ?? "—"} грн</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="rounded-lg bg-slate-900 px-4 py-5 text-sm text-slate-400">На цей фільм поки немає доступних сеансів.</p>
+            )}
+
+            <div className="border-t border-slate-800 pt-4">
+              <Link
+                href={selectedSessionId ? `/movies/${movieId}/seats?sessionId=${encodeURIComponent(selectedSessionId)}&date=${encodeURIComponent(formatDate(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}&time=${encodeURIComponent(formatTime(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}` : "#"}
+                aria-disabled={!selectedSessionId}
+                tabIndex={selectedSessionId ? 0 : -1}
+                className={`block w-full rounded-lg px-6 py-3 text-center text-sm font-bold transition md:ml-auto md:w-auto ${selectedSessionId ? "bg-red-600 text-white hover:bg-red-500" : "pointer-events-none bg-slate-800 text-slate-500"}`}
+              >
+                Забронювати
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );
@@ -201,7 +241,7 @@ function MovieDetailsContent() {
 
 export default function MovieDetailsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0d1117] text-white text-center py-20">Завантаження...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] py-20 text-center text-slate-400">Завантаження…</div>}>
       <MovieDetailsContent />
     </Suspense>
   );

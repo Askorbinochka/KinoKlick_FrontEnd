@@ -9,20 +9,20 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
   const imageUrl = movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1200";
 
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl h-[450px] flex items-center">
+    <section className="relative flex min-h-[290px] items-center overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl sm:min-h-[350px]">
   
       <div className="absolute inset-0 z-0">
-        <img 
+        <img
           src={imageUrl} 
           alt={movie.title} 
-          className="w-full h-full object-cover opacity-40"
+          className="h-full w-full object-cover object-center opacity-40"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0d1117] via-[#0d1117]/80 to-transparent"></div>
       </div>
 
-      <div className="relative z-10 px-8 md:px-12 max-w-2xl space-y-4">
-        <div className="flex gap-2 text-xs">
-          <span className="bg-red-600 text-white px-2.5 py-1 rounded font-medium">ЗАРАЗ У КІНО</span>
+      <div className="relative z-10 max-w-2xl space-y-3 px-5 py-8 sm:px-9 md:px-12">
+        <div className="flex flex-wrap gap-2 text-[10px]">
+          <span className="rounded bg-red-600 px-2.5 py-1 font-medium text-white">ЗАРАЗ У КІНО</span>
           {Array.isArray(movie.genres) && (
             <span className="bg-slate-800/80 text-gray-300 px-2.5 py-1 rounded">
               {movie.genres.join(", ")}
@@ -30,30 +30,30 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
           )}
         </div>
 
-        <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
+        <h1 className="max-w-xl text-2xl font-extrabold tracking-tight text-white sm:text-4xl">
           {movie.title}
         </h1>
 
-        <p className="text-gray-300 text-sm md:text-base line-clamp-3 leading-relaxed">
+        <p className="line-clamp-3 max-w-xl text-xs leading-relaxed text-slate-300 sm:text-sm">
           {movie.description}
         </p>
 
-        <div className="flex items-center gap-4 pt-2">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Link 
             href={`/movies/${movie.id}`}
-            className="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-3 rounded-xl transition flex items-center gap-2"
+            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-xs font-medium text-white transition hover:bg-red-500"
           >
             <span>Забронювати квитки</span>
           </Link>
 
           <Link 
             href={`/movies/${movie.id}`}
-            className="bg-slate-800/80 hover:bg-slate-700 text-white font-medium px-6 py-3 rounded-xl border border-slate-700 transition flex items-center gap-2"
+            className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-xs font-medium text-white transition hover:bg-slate-800"
           >
             <span>Дивитись деталі</span>
           </Link>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

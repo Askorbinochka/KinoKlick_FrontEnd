@@ -4,8 +4,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-
-const API_URL = "https://kinoklick-backend.onrender.com";
+import { API_URL } from "@/app/api";
 
 function SeatSelectionContent() {
   const router = useRouter();
@@ -22,13 +21,22 @@ function SeatSelectionContent() {
   const [seats, setSeats] = useState<any[]>([]);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState("");
 
   // Завантаження інформації про фільм, сеанс та місця із залу
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      setError("Не вдалося визначити сеанс. Поверніться до вибору часу.");
+      setLoading(false);
+      return;
+    }
 
     fetch(`${API_URL}/sessions/${sessionId}/seats`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Не вдалося завантажити місця для цього сеансу.");
+        return res.json();
+      })
       .then((data) => {
         // Згідно зі схемою Swagger, бекенд повертає об'єкт з полями session та seats
         if (data.session) {
@@ -42,6 +50,7 @@ function SeatSelectionContent() {
       })
       .catch((err) => {
         console.error("Помилка завантаження схеми залу:", err);
+        setError(err instanceof Error ? err.message : "Не вдалося завантажити схему залу.");
         setLoading(false);
       });
   }, [sessionId]);
@@ -55,7 +64,8 @@ function SeatSelectionContent() {
     );
   }
 
-  const ticketPrice = session?.basePrice || 150;
+  const selectedSeats = seats.filter((seat) => selectedSeatIds.includes(seat.id));
+  const totalPrice = selectedSeats.reduce((total, seat) => total + (Number(seat.price) || 0), 0);
 
   // Вибір/скасування вибору місця за його унікальним ID
   const toggleSeat = (seat: any) => {
@@ -68,37 +78,37 @@ function SeatSelectionContent() {
     }
   };
 
- const handleGoToPayment = async () => {
-    if (selectedSeatIds.length === 0 || !sessionId) return;
+  const handleGoToPayment = async () => {
+    if (selectedSeatIds.length === 0 || !sessionId || booking) return;
 
+    setBooking(true);
+    setError("");
     try {
-      // Пробуємо надіслати формат, який точно очікує бекенд
       const bookRes = await fetch(`${API_URL}/tickets/book`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId: sessionId,
-          seatIds: selectedSeatIds, // Якщо бекенд вимагає масив ID
+          sessionId,
+          seatIds: selectedSeatIds,
         }),
       });
 
-      const bookData = await bookRes.json();
-      
-      // Якщо бекенд повертає помилку, спробуємо резервний варіант з об'єктами ряд/місце, 
-      // або просто пропустимо далі для тестування оплати, якщо бекенд тимчасово суворий
-      const bookingId = bookData.id || bookData.bookingId || "mock-booking-id";
-      const total = selectedSeatIds.length * ticketPrice;
+      const bookData = await bookRes.json().catch(() => ({}));
+      if (!bookRes.ok) {
+        throw new Error(bookData.message || "Не вдалося забронювати місця. Оновіть карту залу та спробуйте ще раз.");
+      }
+      if (!bookData.id) throw new Error("Бекенд не повернув номер бронювання.");
+
+      const seatLabels = selectedSeats.map((seat) => `${seat.row}-${seat.number}`).join(",");
 
       router.push(
-        `/movies/${movieId}/payment?sessionId=${sessionId}&bookingId=${bookingId}&seats=${selectedSeatIds.join(",")}&total=${total}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`
+        `/movies/${movieId}/payment?sessionId=${sessionId}&bookingId=${encodeURIComponent(bookData.id)}&seats=${encodeURIComponent(seatLabels)}&total=${totalPrice}&expiresAt=${encodeURIComponent(bookData.expiresAt || "")}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`
       );
     } catch (err) {
       console.error("Помилка при переході до броні:", err);
-      // У разі збою мережі все одно даємо користувачу перейти до оплати
-      const total = selectedSeatIds.length * ticketPrice;
-      router.push(
-        `/movies/${movieId}/payment?sessionId=${sessionId}&bookingId=mock-id&seats=${selectedSeatIds.join(",")}&total=${total}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}`
-      );
+      setError(err instanceof Error ? err.message : "Не вдалося створити бронювання. Спробуйте ще раз.");
+    } finally {
+      setBooking(false);
     }
   };
   return (
@@ -125,6 +135,12 @@ function SeatSelectionContent() {
           <div className="w-3/4 h-3 bg-red-600/60 rounded-full blur-sm shadow-[0_0_20px_rgba(239,68,68,0.5)]"></div>
           <span className="text-xs text-gray-400 tracking-widest uppercase">Екран</span>
         </div>
+
+        {error && (
+          <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
         {/* Рендеринг місць на основі даних від бекенда */}
         <div className="bg-[#121621] border border-gray-800 rounded-3xl p-8 flex flex-col items-center gap-3">
@@ -193,19 +209,19 @@ function SeatSelectionContent() {
           <div className="flex items-center gap-8">
             <div className="text-right">
               <p className="text-xs text-gray-400">Загальна вартість</p>
-              <p className="text-xl font-bold text-white">{selectedSeatIds.length * ticketPrice} грн</p>
+              <p className="text-xl font-bold text-white">{totalPrice} грн</p>
             </div>
 
             <button
               onClick={handleGoToPayment}
-              disabled={selectedSeatIds.length === 0}
+              disabled={selectedSeatIds.length === 0 || booking}
               className={`font-bold px-8 py-3.5 rounded-xl transition shadow-lg ${
-                selectedSeatIds.length > 0
+                selectedSeatIds.length > 0 && !booking
                   ? "bg-red-600 hover:bg-red-700 text-white shadow-red-600/30 cursor-pointer"
                   : "bg-gray-800 text-gray-500 cursor-not-allowed"
               }`}
             >
-              Перейти до оплати →
+              {booking ? "Створюємо бронювання…" : "Продовжити →"}
             </button>
           </div>
         </div>
