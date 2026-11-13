@@ -3,17 +3,43 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import { API_URL } from "@/app/api";
 
 type Session = {
   id: string;
   startTime: string;
+  movieId?: string;
+  movie?: { id?: string };
   price?: number;
   basePrice?: number;
   ticketPrice?: number;
   pricePerSeat?: number;
   hall?: { name?: string };
+};
+
+type Movie = {
+  id: string;
+  title: string;
+  description?: string;
+  posterUrl?: string;
+  trailerUrl?: string;
+  genres?: string[] | string;
+  genre?: string;
+  ageRating?: string;
+  ageLimit?: string;
+  ageRestriction?: number;
+  year?: number;
+  releaseYear?: number;
+  releaseDate?: string;
+  country?: string;
+  director?: string;
+  language?: string;
+  production?: string;
+  format?: string;
+  duration?: number;
+  rating?: number;
 };
 
 function asSessions(data: unknown): Session[] {
@@ -47,6 +73,15 @@ function formatDate(value: string) {
   });
 }
 
+function formatFullDate(value: string) {
+  return new Date(value).toLocaleDateString("uk-UA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Kyiv",
+  });
+}
+
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString("uk-UA", {
     hour: "2-digit",
@@ -59,7 +94,7 @@ function MovieDetailsContent() {
   const params = useParams<{ id: string }>();
   const movieId = params.id;
 
-  const [movie, setMovie] = useState<any>(null);
+  const [movie, setMovie] = useState<Movie | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -76,10 +111,10 @@ function MovieDetailsContent() {
       .then(async ([movieRes, sessionsRes]) => {
         if (!movieRes.ok) throw new Error("Не вдалося завантажити інформацію про фільм.");
         if (!sessionsRes.ok) throw new Error("Не вдалося завантажити розклад сеансів.");
-        const [movieData, sessionsData] = await Promise.all([movieRes.json(), sessionsRes.json()]);
+        const [movieData, sessionsData] = await Promise.all([movieRes.json() as Promise<Movie>, sessionsRes.json()]);
         setMovie(movieData);
         const relatedSessions = asSessions(sessionsData)
-          .filter((session: any) =>
+          .filter((session) =>
             (session.movieId === movieId || session.movie?.id === movieId) &&
             new Date(session.startTime).getTime() >= Date.now()
           );
@@ -107,25 +142,28 @@ function MovieDetailsContent() {
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   if (loading) {
-    return <div className="min-h-screen bg-[#0b0e14] text-white"><Navbar /><p className="py-20 text-center text-slate-400">Завантажуємо сторінку фільму…</p></div>;
+    return <div className="min-h-screen bg-[#0d1016] text-white"><Navbar /><p className="py-20 text-center text-slate-400">Завантажуємо сторінку фільму…</p></div>;
   }
 
   if (!movie) {
-    return <div className="min-h-screen bg-[#0b0e14] text-white"><Navbar /><p role="alert" className="py-20 text-center text-red-300">{error || "Фільм не знайдено."}</p></div>;
+    return <div className="min-h-screen bg-[#0d1016] text-white"><Navbar /><p role="alert" className="py-20 text-center text-red-300">{error || "Фільм не знайдено."}</p></div>;
   }
 
   const genres = Array.isArray(movie.genres) ? movie.genres.join(", ") : movie.genres || movie.genre || "—";
   const metadata = [
-    ["Вікове обмеження", movie.ageRating || movie.ageLimit || movie.ageRestriction],
-    ["Рік", movie.year || movie.releaseYear || (movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : null)],
-    ["Країна", movie.country],
-    ["Режисер", movie.director],
-    ["Жанр", genres],
-    ["Тривалість", movie.duration ? `${movie.duration} хв` : null],
-  ].filter(([, value]) => value);
+    { label: "Вікове обмеження", value: movie.ageRating || movie.ageLimit || movie.ageRestriction },
+    { label: "Рік", value: movie.year || movie.releaseYear || (movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : null) },
+    { label: "Країна", value: movie.country },
+    { label: "Режисер", value: movie.director },
+    { label: "Мова", value: movie.language },
+    { label: "Жанр", value: genres },
+    { label: "Тривалість", value: movie.duration ? `${movie.duration} хв` : null },
+    { label: "Виробництво", value: movie.production || movie.country },
+    { label: "Формат", value: movie.format },
+  ].filter((item) => item.value != null && item.value !== "");
 
   return (
-    <div className="min-h-screen bg-[#0b0e14] text-white">
+    <div className="min-h-screen bg-[#0d1016] text-white">
       <Navbar />
       <main className="mx-auto w-full max-w-[1160px] space-y-6 px-4 py-5 sm:px-6 lg:px-8">
         <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Навігаційний ланцюжок">
@@ -133,11 +171,13 @@ function MovieDetailsContent() {
         </nav>
 
         <section className="grid gap-6 md:grid-cols-[260px_1fr] lg:gap-8">
-          <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-            <img
+          <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+            <Image
               src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}
               alt={`Постер фільму «${movie.title}»`}
-              className="aspect-[2/3] w-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 260px"
+              className="object-cover"
             />
             {movie.trailerUrl && (
               <a href={movie.trailerUrl} target="_blank" rel="noreferrer" className="block border-t border-slate-800 px-4 py-3 text-center text-xs text-slate-300 hover:text-white">
@@ -156,7 +196,7 @@ function MovieDetailsContent() {
             </div>
 
             <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-3 border-y border-slate-800 py-4 text-xs sm:grid-cols-3">
-              {metadata.map(([label, value]) => (
+              {metadata.map(({ label, value }) => (
                 <div key={label}>
                   <dt className="text-slate-500">{label}</dt>
                   <dd className="mt-1 font-medium text-slate-200">{value}</dd>
@@ -172,7 +212,7 @@ function MovieDetailsContent() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-[#111722] p-4 sm:p-6">
+        <section className="rounded-xl border border-white/[0.07] bg-[#121720] p-4 sm:p-6">
           <div className="space-y-4">
             <div>
               <h2 className="text-base font-bold">Оберіть сеанс</h2>
@@ -219,12 +259,16 @@ function MovieDetailsContent() {
                 </div>
               </>
             ) : (
-              <p className="rounded-lg bg-slate-900 px-4 py-5 text-sm text-slate-400">На цей фільм поки немає доступних сеансів.</p>
+              <div className="rounded-lg border border-white/[0.05] bg-[#0d1016] px-4 py-5">
+                <p className="text-sm font-semibold text-slate-200">На цю дату сеансів немає</p>
+                <p className="mt-1 text-xs text-slate-400">Оберіть іншу дату, щоб продовжити бронювання.</p>
+                <Link href="/" className="mt-4 inline-flex rounded-lg bg-[#e3262d] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#f13a41]">До доступних сеансів</Link>
+              </div>
             )}
 
             <div className="border-t border-slate-800 pt-4">
               <Link
-                href={selectedSessionId ? `/movies/${movieId}/seats?sessionId=${encodeURIComponent(selectedSessionId)}&date=${encodeURIComponent(formatDate(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}&time=${encodeURIComponent(formatTime(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}` : "#"}
+                href={selectedSessionId ? `/movies/${movieId}/seats?sessionId=${encodeURIComponent(selectedSessionId)}&date=${encodeURIComponent(formatFullDate(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}&time=${encodeURIComponent(formatTime(sessions.find((session) => session.id === selectedSessionId)?.startTime || ""))}` : "#"}
                 aria-disabled={!selectedSessionId}
                 tabIndex={selectedSessionId ? 0 : -1}
                 className={`block w-full rounded-lg px-6 py-3 text-center text-sm font-bold transition md:ml-auto md:w-auto ${selectedSessionId ? "bg-red-600 text-white hover:bg-red-500" : "pointer-events-none bg-slate-800 text-slate-500"}`}
@@ -241,7 +285,7 @@ function MovieDetailsContent() {
 
 export default function MovieDetailsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] py-20 text-center text-slate-400">Завантаження…</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1016] py-20 text-center text-slate-400">Завантаження…</div>}>
       <MovieDetailsContent />
     </Suspense>
   );

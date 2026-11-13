@@ -1,27 +1,10 @@
 type DateFilterProps = {
+  dates: Array<{ key: string; day: string; label: string }>;
   selectedDate: string;
   onSelect: (date: string) => void;
 };
 
-function dateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-export default function DateFilter({ selectedDate, onSelect }: DateFilterProps) {
-  const today = new Date();
-  const dates = Array.from({ length: 4 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-    return {
-      key: dateKey(date),
-      day: date.toLocaleDateString("uk-UA", { day: "2-digit" }),
-      label: index === 0 ? "Сьогодні" : index === 1 ? "Завтра" : date.toLocaleDateString("uk-UA", { weekday: "short" }),
-    };
-  });
-
+export default function DateFilter({ dates, selectedDate, onSelect }: DateFilterProps) {
   return (
     <div className="flex gap-2 overflow-x-auto py-2" aria-label="Оберіть дату сеансу">
       {dates.map((item) => (

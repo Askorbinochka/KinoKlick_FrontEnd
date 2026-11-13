@@ -6,9 +6,29 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { API_URL } from "@/app/api";
 
+type Seat = {
+  id: string;
+  row: number;
+  number: number;
+  type: string;
+  status: string;
+  price: number;
+};
+
+type SeatMapResponse = {
+  session?: {
+    id: string;
+    startTime: string;
+    basePrice: number;
+    movie?: { title?: string };
+    hall?: { name?: string };
+  };
+  seats: Seat[];
+};
+
 function SeatSelectionContent() {
   const router = useRouter();
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
 
   const movieId = params.id;
@@ -16,48 +36,40 @@ function SeatSelectionContent() {
   const selectedDate = searchParams.get("date") || "";
   const selectedTime = searchParams.get("time") || "";
 
-  const [movie, setMovie] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
-  const [seats, setSeats] = useState<any[]>([]);
+  const [seatMap, setSeatMap] = useState<SeatMapResponse | null>(null);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
+  const loading = Boolean(sessionId) && loadedSessionId !== sessionId;
+  const visibleError = !sessionId ? "Не вдалося визначити сеанс. Поверніться до вибору часу." : error;
+  const session = seatMap?.session ?? null;
+  const movie = session?.movie ?? null;
+  const seats = seatMap?.seats ?? [];
 
   // Завантаження інформації про фільм, сеанс та місця із залу
   useEffect(() => {
-    if (!sessionId) {
-      setError("Не вдалося визначити сеанс. Поверніться до вибору часу.");
-      setLoading(false);
-      return;
-    }
+    if (!sessionId) return;
 
     fetch(`${API_URL}/sessions/${sessionId}/seats`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Не вдалося завантажити місця для цього сеансу.");
         return res.json();
       })
-      .then((data) => {
-        // Згідно зі схемою Swagger, бекенд повертає об'єкт з полями session та seats
-        if (data.session) {
-          setSession(data.session);
-          setMovie(data.session.movie);
-        }
-        if (data.seats && Array.isArray(data.seats)) {
-          setSeats(data.seats);
-        }
-        setLoading(false);
+      .then((data: SeatMapResponse) => {
+        setSeatMap(data);
+        setLoadedSessionId(sessionId);
       })
       .catch((err) => {
         console.error("Помилка завантаження схеми залу:", err);
         setError(err instanceof Error ? err.message : "Не вдалося завантажити схему залу.");
-        setLoading(false);
+        setLoadedSessionId(sessionId);
       });
   }, [sessionId]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0e14] text-white">
+      <div className="min-h-screen bg-[#0d1016] text-white">
         <Navbar />
         <div className="text-center py-20 text-gray-400">Завантаження схеми залу...</div>
       </div>
@@ -68,7 +80,7 @@ function SeatSelectionContent() {
   const totalPrice = selectedSeats.reduce((total, seat) => total + (Number(seat.price) || 0), 0);
 
   // Вибір/скасування вибору місця за його унікальним ID
-  const toggleSeat = (seat: any) => {
+  const toggleSeat = (seat: Seat) => {
     if (seat.status !== "AVAILABLE") return;
 
     if (selectedSeatIds.includes(seat.id)) {
@@ -107,123 +119,106 @@ function SeatSelectionContent() {
     } catch (err) {
       console.error("Помилка при переході до броні:", err);
       setError(err instanceof Error ? err.message : "Не вдалося створити бронювання. Спробуйте ще раз.");
+      try {
+        const refreshed = await fetch(`${API_URL}/sessions/${sessionId}/seats`);
+        if (refreshed.ok) {
+          const updatedMap = await refreshed.json() as SeatMapResponse;
+          setSeatMap(updatedMap);
+          setSelectedSeatIds((current) => current.filter((id) => updatedMap.seats.some((seat) => seat.id === id && seat.status === "AVAILABLE")));
+        }
+      } catch {
+        // Keep the original booking error visible if refreshing the seat map also fails.
+      }
     } finally {
       setBooking(false);
     }
   };
   return (
-    <div className="min-h-screen bg-[#0b0e14] text-white">
+    <div className="min-h-screen bg-[#0d1016] text-white">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/movies/${movieId}`}
-            className="bg-gray-800 p-2 rounded-xl hover:bg-gray-700 transition"
-          >
-            ←
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold">{movie?.title}</h1>
-            <p className="text-xs text-gray-400">
-              {selectedDate}, {selectedTime} • {session?.hall?.name || "Зал 1"}
-            </p>
+      <main className="mx-auto w-full max-w-[1200px] space-y-5 px-5 py-7 sm:px-8">
+        <div>
+          <Link href={`/movies/${movieId}`} className="text-xs text-slate-400 transition hover:text-white">← Дата та сеанс</Link>
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Оберіть місця</h1>
+              <p className="mt-2 text-sm text-slate-400">{movie?.title}</p>
+              <p className="mt-1 text-xs text-slate-500">{selectedDate} · {selectedTime} · {session?.hall?.name || "Зал 1"} · 2D · українською</p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500"><span>01 Сеанс</span><span>→</span><span className="font-semibold text-white">02 Місця</span><span>→</span><span>03 Оплата</span></div>
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center space-y-4 py-6 bg-[#121621] rounded-3xl border border-gray-800">
-          <div className="w-3/4 h-3 bg-red-600/60 rounded-full blur-sm shadow-[0_0_20px_rgba(239,68,68,0.5)]"></div>
-          <span className="text-xs text-gray-400 tracking-widest uppercase">Екран</span>
-        </div>
+        {visibleError && <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">{visibleError}</p>}
 
-        {error && (
-          <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {error}
-          </p>
-        )}
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="min-w-0 rounded-xl border border-white/[0.07] bg-[#121720] p-4 sm:p-7" aria-label="Схема залу">
+            <div className="mb-8 flex flex-col items-center gap-2">
+              <div className="h-1.5 w-[78%] rounded-[50%] bg-gradient-to-r from-transparent via-slate-200/70 to-transparent shadow-[0_5px_18px_rgba(226,38,45,0.32)]" />
+              <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Екран</span>
+            </div>
 
-        {/* Рендеринг місць на основі даних від бекенда */}
-        <div className="bg-[#121621] border border-gray-800 rounded-3xl p-8 flex flex-col items-center gap-3">
-          {Array.from(new Set(seats.map((s) => s.row))).sort((a, b) => a - b).map((rowNum) => (
-            <div key={rowNum} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-4 text-center">{rowNum}</span>
-              <div className="flex gap-1.5">
-                {seats
-                  .filter((s) => s.row === rowNum)
-                  .sort((a, b) => a.number - b.number)
-                  .map((seat) => {
-                    const isSelected = selectedSeatIds.includes(seat.id);
-                    const isAvailable = seat.status === "AVAILABLE";
-
-                    let bgClass = "bg-[#1b2230] text-gray-400 hover:bg-gray-700";
-                    if (!isAvailable) {
-                      bgClass = "bg-gray-800 text-gray-600 cursor-not-allowed";
-                    } else if (isSelected) {
-                      bgClass = "bg-red-600 text-white shadow-lg shadow-red-600/40";
-                    } else if (seat.type === "VIP") {
-                      bgClass = "bg-amber-500/20 text-amber-300 border border-amber-500/40";
-                    }
-
-                    return (
-                      <button
-                        key={seat.id}
-                        disabled={!isAvailable}
-                        onClick={() => toggleSeat(seat)}
-                        className={`w-7 h-7 rounded-lg text-[10px] font-medium transition ${bgClass}`}
-                      >
-                        {seat.number}
-                      </button>
-                    );
-                  })}
+            {seats.length ? (
+              <div className="overflow-x-auto pb-2">
+                <div className="mx-auto flex w-max min-w-full flex-col items-center gap-2.5">
+                  {Array.from(new Set(seats.map((seat) => seat.row))).sort((a, b) => a - b).map((rowNum) => (
+                    <div key={rowNum} className="flex items-center gap-2">
+                      <span className="w-5 text-center text-[10px] text-slate-500">{rowNum}</span>
+                      <div className="flex gap-1.5">
+                        {seats.filter((seat) => seat.row === rowNum).sort((a, b) => a.number - b.number).map((seat) => {
+                          const isSelected = selectedSeatIds.includes(seat.id);
+                          const isAvailable = seat.status === "AVAILABLE";
+                          const bgClass = !isAvailable
+                            ? "cursor-not-allowed border-transparent bg-[#080b10] text-slate-700"
+                            : isSelected
+                              ? "border-[#e3262d] bg-[#e3262d] text-white shadow-[0_0_12px_rgba(227,38,45,0.3)]"
+                              : seat.type === "VIP"
+                                ? "border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                                : "border-slate-600 bg-[#19202c] text-slate-200 hover:border-slate-300 hover:bg-[#222b39]";
+                          return (
+                            <button key={seat.id} type="button" disabled={!isAvailable} onClick={() => toggleSeat(seat)} aria-pressed={isSelected} aria-label={`Ряд ${seat.row}, місце ${seat.number}${isSelected ? ", вибране" : isAvailable ? ", вільне" : ", зайняте"}`} className={`h-8 w-8 rounded-md border text-[10px] font-medium transition ${bgClass}`}>
+                              {isAvailable ? seat.number : "×"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <span className="w-5 text-center text-[10px] text-slate-500">{rowNum}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <span className="text-xs text-gray-500 w-4 text-center">{rowNum}</span>
+            ) : (
+              <div className="rounded-lg bg-[#0d1016] p-8 text-center text-sm text-slate-400">Місць для цього сеансу не знайдено.</div>
+            )}
+
+            <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-slate-400">
+              <span className="flex items-center gap-2"><span className="h-4 w-4 rounded border border-slate-600 bg-[#19202c]" />Вільні · {seats.filter((seat) => seat.status === "AVAILABLE").length}</span>
+              <span className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-[#e3262d]" />Вибрані</span>
+              <span className="flex items-center gap-2"><span className="grid h-4 w-4 place-items-center rounded bg-[#080b10] text-slate-600">×</span>Зайняті</span>
             </div>
-          ))}
+          </section>
 
-          <div className="flex items-center gap-6 mt-8 text-xs text-gray-400">
-            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-[#1b2230]"></span> Вільні</div>
-            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-red-600"></span> Вибрані</div>
-            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-gray-800"></span> Зайняті/Куплені</div>
-          </div>
-        </div>
-
-        <div className="bg-[#121621] border border-gray-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <p className="text-xs text-gray-400">ОБРАНІ МІСЦЯ ({selectedSeatIds.length})</p>
-            <div className="flex gap-2 mt-1 flex-wrap">
-              {selectedSeatIds.length > 0 ? (
-                selectedSeatIds.map((id) => {
-                  const seatObj = seats.find((s) => s.id === id);
-                  return (
-                    <span key={id} className="text-xs bg-[#181f2d] px-3 py-1.5 rounded-lg border border-gray-800 text-white">
-                      {seatObj ? `${seatObj.row} ряд, ${seatObj.number} місце` : "Місце"}
-                    </span>
-                  );
-                })
-              ) : (
-                <span className="text-sm text-gray-500">Місця не вибрано</span>
-              )}
+          <aside className="rounded-xl border border-white/[0.07] bg-[#121720] p-5 lg:sticky lg:top-16">
+            <h2 className="text-base font-bold">Ваш вибір</h2>
+            <p className="mt-2 text-xs text-slate-400">{movie?.title}</p>
+            <p className="mt-1 text-xs text-slate-500">{selectedDate} · {selectedTime}</p>
+            <p className="mt-1 text-xs text-slate-500">{session?.hall?.name || "Зал 1"} · 2D</p>
+            <div className="my-4 border-t border-white/[0.07]" />
+            <p className="text-xs font-semibold text-slate-300">Ваші місця — за вами.</p>
+            <p className="mt-1 text-xs text-slate-500">Ряд · номер місця</p>
+            <div className="mt-3 min-h-16 space-y-2">
+              {selectedSeats.length ? selectedSeats.map((seat) => (
+                <div key={seat.id} className="flex justify-between gap-3 text-xs text-slate-300"><span>Ряд {seat.row} · місце {seat.number}</span><span>{seat.price} грн</span></div>
+              )) : <p className="text-xs text-slate-500">Оберіть місця на схемі залу.</p>}
             </div>
-          </div>
-
-          <div className="flex items-center gap-8">
-            <div className="text-right">
-              <p className="text-xs text-gray-400">Загальна вартість</p>
-              <p className="text-xl font-bold text-white">{totalPrice} грн</p>
-            </div>
-
-            <button
-              onClick={handleGoToPayment}
-              disabled={selectedSeatIds.length === 0 || booking}
-              className={`font-bold px-8 py-3.5 rounded-xl transition shadow-lg ${
-                selectedSeatIds.length > 0 && !booking
-                  ? "bg-red-600 hover:bg-red-700 text-white shadow-red-600/30 cursor-pointer"
-                  : "bg-gray-800 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {booking ? "Створюємо бронювання…" : "Продовжити →"}
+            <div className="my-4 border-t border-white/[0.07]" />
+            <div className="flex items-end justify-between"><span className="text-xs text-slate-400">{selectedSeatIds.length} квитки</span><span className="text-xl font-bold">{totalPrice} грн</span></div>
+            <p className="mt-3 text-[10px] leading-4 text-slate-500">Після продовження місця утримуватимуться 15 хвилин.</p>
+            <button type="button" onClick={handleGoToPayment} disabled={selectedSeatIds.length === 0 || booking} className="mt-5 w-full rounded-lg bg-[#e3262d] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#f13a41] disabled:cursor-not-allowed disabled:bg-[#252b36] disabled:text-slate-500">
+              {booking ? "Бронюємо місця…" : "До оформлення"}
             </button>
-          </div>
+          </aside>
         </div>
       </main>
     </div>
@@ -232,7 +227,7 @@ function SeatSelectionContent() {
 
 export default function SeatSelection() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] text-white text-center py-20">Завантаження...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1016] text-white text-center py-20">Завантаження...</div>}>
       <SeatSelectionContent />
     </Suspense>
   );

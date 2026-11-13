@@ -2,15 +2,19 @@
 
 :root {
   color-scheme: dark;
-  --background: #0b0e14;
-  --foreground: #f4f6fb;
+  --background: #0d1016;
+  --foreground: #f5f6f8;
+  --surface: #121720;
+  --surface-raised: #171d28;
+  --border: rgba(148, 163, 184, 0.14);
+  --accent: #e3262d;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
@@ -18,6 +22,21 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100%;
+}
+
+::selection {
+  background: rgb(227 38 45 / 35%);
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(248 74 80 / 85%);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-color: #303846 #0d1016;
+  scrollbar-width: thin;
 }
 
 button {

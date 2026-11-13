@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import { API_URL } from "@/app/api";
 
@@ -24,7 +25,7 @@ type Confirmation = {
 };
 
 function PaymentContent() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const movieId = params.id;
 
@@ -52,7 +53,6 @@ function PaymentContent() {
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("card");
   const [demoScenario, setDemoScenario] = useState<"success" | "declined">("success");
   const [showExpiredDemo, setShowExpiredDemo] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -62,11 +62,6 @@ function PaymentContent() {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!movieId) {
-      setLoading(false);
-      return;
-    }
-
     fetch(`${API_URL}/movies/${movieId}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Не вдалося завантажити інформацію про фільм.");
@@ -135,7 +130,7 @@ function PaymentContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0e14] text-white">
+      <div className="min-h-screen bg-[#0d1016] text-white">
         <Navbar />
         <div className="text-center py-20 text-gray-400">Завантаження замовлення...</div>
       </div>
@@ -144,7 +139,7 @@ function PaymentContent() {
 
   if (!bookingId) {
     return (
-      <div className="min-h-screen bg-[#0b0e14] text-white">
+      <div className="min-h-screen bg-[#0d1016] text-white">
         <Navbar />
         <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-5">
           <h1 className="text-2xl font-bold">Бронювання не знайдено</h1>
@@ -158,7 +153,7 @@ function PaymentContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0e14] text-white">
+    <div className="min-h-screen bg-[#0d1016] text-white">
       <Navbar />
 
       <main className="mx-auto max-w-[1160px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -166,10 +161,11 @@ function PaymentContent() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="space-y-5 rounded-2xl border border-slate-800 bg-[#111722] p-5 md:p-7 lg:col-span-7">
               <div>
-                <h1 className="text-2xl font-bold">Підтвердження бронювання</h1>
+                <h1 className="text-2xl font-bold">Оформлення замовлення</h1>
                 <p className="text-sm text-gray-400 mt-2">
                   Вкажіть контактні дані для оформлення замовлення та електронних квитків.
                 </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-500"><span>01 Сеанс</span><span>→</span><span>02 Місця</span><span>→</span><span className="font-semibold text-white">03 Оплата</span><span>→</span><span>04 Квиток</span></div>
               </div>
 
               {countdownLabel && (
@@ -180,31 +176,9 @@ function PaymentContent() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-400">Спосіб оплати</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    ["apple", "Apple Pay"],
-                    ["card", "Картка"],
-                    ["google", "Google Pay"],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setPaymentMethod(value)}
-                      aria-pressed={paymentMethod === value}
-                      className={`rounded-lg border px-2 py-3 text-xs transition ${paymentMethod === value ? "border-red-500 bg-red-500/10 text-white" : "border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-600"}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <form onSubmit={handleConfirm} className="space-y-4">
-
-              {paymentMethod === "card" && (
-                <div className="space-y-4">
+                <section className="space-y-4">
+                  <h2 className="text-sm font-semibold text-white">Банківська картка</h2>
                   <div>
                     <label htmlFor="card-holder" className="mb-1 block text-xs text-slate-400">ІМ’Я ВЛАСНИКА КАРТКИ</label>
                     <input id="card-holder" type="text" autoComplete="cc-name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
@@ -223,15 +197,7 @@ function PaymentContent() {
                       <input id="card-cvv" type="password" inputMode="numeric" autoComplete="cc-csc" placeholder="•••" value={cardCvv} onChange={(event) => setCardCvv(event.target.value)} required maxLength={4} pattern="[0-9]{3,4}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {paymentMethod !== "card" && (
-                <div>
-                  <label htmlFor="customer-name" className="mb-1 block text-xs text-slate-400">ІМ’Я ТА ПРІЗВИЩЕ</label>
-                  <input id="customer-name" type="text" autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
-                </div>
-              )}
+                </section>
 
               {demoMode && (
                 <div className="flex flex-wrap gap-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
@@ -241,30 +207,32 @@ function PaymentContent() {
                 </div>
               )}
 
-                <div>
-                  <label htmlFor="customer-email" className="mb-1 block text-xs text-slate-400">EMAIL</label>
-                  <input
-                    id="customer-email"
-                    type="email"
-                    autoComplete="email"
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                    required
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="customer-phone" className="mb-1 block text-xs text-slate-400">НОМЕР ТЕЛЕФОНУ</label>
-                  <input
-                    id="customer-phone"
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="+380501234567"
-                    value={customerPhone}
-                    onChange={(event) => setCustomerPhone(event.target.value)}
-                    required
-                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="customer-email" className="mb-1 block text-xs text-slate-400">ЕЛЕКТРОННА ПОШТА</label>
+                    <input
+                      id="customer-email"
+                      type="email"
+                      autoComplete="email"
+                      value={customerEmail}
+                      onChange={(event) => setCustomerEmail(event.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="customer-phone" className="mb-1 block text-xs text-slate-400">ТЕЛЕФОН</label>
+                    <input
+                      id="customer-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      placeholder="+380 67 123 45 67"
+                      value={customerPhone}
+                      onChange={(event) => setCustomerPhone(event.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500"
+                    />
+                  </div>
                 </div>
 
                 {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
@@ -281,8 +249,8 @@ function PaymentContent() {
 
             <aside className="lg:col-span-5">
               <div className="sticky top-16 space-y-4 rounded-2xl border border-slate-800 bg-[#111722] p-5">
-                <div className="aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-                  {movie?.posterUrl && <img src={movie.posterUrl} alt={movie.title || "Постер фільму"} className="w-full h-full object-cover" />}
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+                  {movie?.posterUrl && <Image src={movie.posterUrl} alt={movie.title || "Постер фільму"} fill sizes="(max-width: 1024px) 100vw, 420px" className="object-cover" />}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{movie?.title || "Ваше замовлення"}</h2>
@@ -308,9 +276,9 @@ function PaymentContent() {
 
             {ticketData?.tickets?.length ? ticketData.tickets.map((ticket) => (
               <article key={ticket.id} className="bg-[#121621] border border-gray-800 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-40 h-40 shrink-0 bg-white rounded-2xl p-2 flex items-center justify-center">
+                <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-2xl bg-white p-2">
                   {ticket.qrCodeImage ? (
-                    <img src={ticket.qrCodeImage} alt={`QR-код квитка ${ticket.id}`} className="w-full h-full object-contain" />
+                    <Image src={ticket.qrCodeImage} alt={`QR-код квитка ${ticket.id}`} width={144} height={144} unoptimized className="h-full w-full object-contain" />
                   ) : (
                     <p className="text-black text-xs break-all text-center">{ticket.qrCode}</p>
                   )}
@@ -328,10 +296,9 @@ function PaymentContent() {
               <p role="alert" className="text-center text-amber-200">Замовлення підтверджене, але бекенд не повернув список квитків.</p>
             )}
 
-            <div className="text-center">
-              <Link href="/" className="inline-block bg-[#181f2d] hover:bg-gray-800 px-8 py-3.5 rounded-xl border border-gray-800 text-sm font-medium">
-                ← Повернутися на головну
-              </Link>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/tickets/my" className="inline-block rounded-lg bg-[#e3262d] px-8 py-3.5 text-sm font-bold text-white transition hover:bg-[#f13a41]">До моїх квитків</Link>
+              <Link href="/" className="inline-block rounded-lg border border-white/[0.07] bg-[#19202c] px-8 py-3.5 text-sm font-medium text-slate-200 transition hover:bg-[#222b39]">До афіші</Link>
             </div>
           </div>
         )}
@@ -362,7 +329,7 @@ function PaymentContent() {
 
 export default function PaymentPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0b0e14] text-white text-center py-20">Завантаження...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1016] text-white text-center py-20">Завантаження...</div>}>
       <PaymentContent />
     </Suspense>
   );

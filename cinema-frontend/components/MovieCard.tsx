@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Movie } from "@/app/page";
 
 type MovieSession = {
@@ -14,6 +15,7 @@ type MovieCardProps = {
   movie: Movie;
   sessions: MovieSession[];
   selectedDate: string;
+  referenceTime: number;
 };
 
 function dateKey(value: string) {
@@ -35,23 +37,26 @@ function formatTime(value: string) {
   });
 }
 
-export default function MovieCard({ movie, sessions, selectedDate }: MovieCardProps) {
+export default function MovieCard({ movie, sessions, selectedDate, referenceTime }: MovieCardProps) {
   const imageUrl = movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600";
   const genres = Array.isArray(movie.genres) ? movie.genres.join(", ") : movie.genres || "";
   const ageRating = movie.ageRating ?? movie.ageRestriction;
-  const upcomingSessions = sessions.filter((session) => new Date(session.startTime).getTime() >= Date.now());
-  const prices = sessions.map((session) => Number(session.price ?? session.basePrice ?? session.ticketPrice ?? session.pricePerSeat)).filter((price) => Number.isFinite(price) && price > 0);
+  const daySessions = sessions.filter((session) =>
+    dateKey(session.startTime) === selectedDate && new Date(session.startTime).getTime() >= referenceTime
+  );
+  const prices = daySessions.map((session) => Number(session.price ?? session.basePrice ?? session.ticketPrice ?? session.pricePerSeat)).filter((price) => Number.isFinite(price) && price > 0);
   const lowestPrice = prices.length ? Math.min(...prices) : null;
-  const daySessions = upcomingSessions.filter((session) => dateKey(session.startTime) === selectedDate);
 
   return (
-    <article className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#111722] transition hover:border-slate-600">
+    <article className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#121720] transition hover:border-white/20">
       <Link href={`/movies/${movie.id}`} className="block overflow-hidden">
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
-          <img
+          <Image
             src={imageUrl}
             alt={`Постер фільму «${movie.title}»`}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover transition duration-300 group-hover:scale-[1.03]"
           />
           {ageRating != null && <span className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">{ageRating}+</span>}
         </div>
@@ -70,7 +75,7 @@ export default function MovieCard({ movie, sessions, selectedDate }: MovieCardPr
           <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">Сеанси</p>
           {daySessions.length ? (
             <div className="flex flex-wrap gap-1.5">
-              {daySessions.slice(0, 4).map((session) => (
+              {daySessions.slice(0, 3).map((session) => (
                 <Link
                   key={session.id}
                   href={`/movies/${movie.id}`}
@@ -85,11 +90,9 @@ export default function MovieCard({ movie, sessions, selectedDate }: MovieCardPr
           )}
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-2 border-t border-slate-800 pt-3 mt-3">
-          <p className="text-[10px] text-slate-400">Квитки від <span className="block text-xs font-bold text-white">{lowestPrice !== null ? `${lowestPrice} грн` : "—"}</span></p>
-          <Link href={`/movies/${movie.id}`} className="rounded-lg bg-red-600 px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-red-500">
-            Забронювати
-          </Link>
+        <div className="mt-auto flex items-end justify-between gap-2 border-t border-slate-800 pt-3">
+          <p className="text-[10px] text-slate-400">Квитки від</p>
+          <p className="text-sm font-bold text-white">{lowestPrice !== null ? `${lowestPrice} грн` : "—"}</p>
         </div>
       </div>
     </article>
