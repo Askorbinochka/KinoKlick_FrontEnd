@@ -171,16 +171,18 @@ function MovieDetailsContent() {
         </nav>
 
         <section className="grid gap-6 md:grid-cols-[260px_1fr] lg:gap-8">
-          <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-            <Image
-              src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}
-              alt={`Постер фільму «${movie.title}»`}
-              fill
-              sizes="(max-width: 768px) 100vw, 260px"
-              className="object-cover"
-            />
+          <div className="space-y-3">
+            <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+              <Image
+                src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}
+                alt={`Постер фільму «${movie.title}»`}
+                fill
+                sizes="(max-width: 768px) 100vw, 260px"
+                className="object-cover"
+              />
+            </div>
             {movie.trailerUrl && (
-              <a href={movie.trailerUrl} target="_blank" rel="noreferrer" className="block border-t border-slate-800 px-4 py-3 text-center text-xs text-slate-300 hover:text-white">
+              <a href={movie.trailerUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-[#19202c] px-4 py-3 text-center text-xs font-semibold text-slate-200 transition hover:border-red-500/50 hover:text-white">
                 ▶ Дивитись трейлер
               </a>
             )}
