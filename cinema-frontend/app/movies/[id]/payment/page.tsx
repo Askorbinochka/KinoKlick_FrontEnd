@@ -88,6 +88,19 @@ function PaymentContent() {
     return () => window.clearInterval(timer);
   }, [expiresAt]);
 
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem("kinoklik-user");
+      if (!savedUser) return;
+      const user = JSON.parse(savedUser) as { name?: string; email?: string; phone?: string };
+      if (user.name) setCustomerName(user.name);
+      if (user.email) setCustomerEmail(user.email);
+      if (user.phone) setCustomerPhone(user.phone);
+    } catch {
+      localStorage.removeItem("kinoklik-user");
+    }
+  }, []);
+
   const handleConfirm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!bookingId || confirming || secondsLeft === 0 || showExpiredDemo) return;
@@ -101,9 +114,13 @@ function PaymentContent() {
     setError("");
 
     try {
+      const token = localStorage.getItem("kinoklik-token");
       const response = await fetch(`${API_URL}/tickets/confirm/${encodeURIComponent(bookingId)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ customerName, customerEmail, customerPhone }),
       });
       const data = await response.json().catch(() => ({}));
@@ -178,23 +195,24 @@ function PaymentContent() {
 
               <form onSubmit={handleConfirm} className="space-y-4">
                 <section className="space-y-4">
-                  <h2 className="text-sm font-semibold text-white">Банківська картка</h2>
+                  <h2 className="text-sm font-semibold text-white">Банківська картка · демо</h2>
+                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-xs leading-5 text-amber-100/80">Це демонстраційне оформлення: справжній платіж не виконується. Номер картки, термін дії та CVV не надсилаються бекенду й не зберігаються. Сервер підтверджує бронювання за контактними даними.</p>
                   <div>
-                    <label htmlFor="card-holder" className="mb-1 block text-xs text-slate-400">ІМ’Я ВЛАСНИКА КАРТКИ</label>
+                    <label htmlFor="card-holder" className="mb-1 block text-xs text-slate-400">ІМ’Я КЛІЄНТА</label>
                     <input id="card-holder" type="text" autoComplete="cc-name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                   </div>
                   <div>
                     <label htmlFor="card-number" className="mb-1 block text-xs text-slate-400">НОМЕР КАРТКИ</label>
-                    <input id="card-number" type="text" inputMode="numeric" autoComplete="cc-number" placeholder="•••• •••• •••• 4321" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} required maxLength={19} pattern="[0-9 ]{13,19}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
+                    <input id="card-number" type="text" inputMode="numeric" autoComplete="off" placeholder="•••• •••• •••• 4321" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} maxLength={19} className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="card-expiry" className="mb-1 block text-xs text-slate-400">ТЕРМІН ДІЇ</label>
-                      <input id="card-expiry" type="text" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={cardExpiry} onChange={(event) => setCardExpiry(event.target.value)} required maxLength={5} pattern="(0[1-9]|1[0-2])/[0-9]{2}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
+                      <input id="card-expiry" type="text" inputMode="numeric" autoComplete="off" placeholder="MM/YY" value={cardExpiry} onChange={(event) => setCardExpiry(event.target.value)} maxLength={5} className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                     </div>
                     <div>
                       <label htmlFor="card-cvv" className="mb-1 block text-xs text-slate-400">CVV</label>
-                      <input id="card-cvv" type="password" inputMode="numeric" autoComplete="cc-csc" placeholder="•••" value={cardCvv} onChange={(event) => setCardCvv(event.target.value)} required maxLength={4} pattern="[0-9]{3,4}" className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
+                      <input id="card-cvv" type="password" inputMode="numeric" autoComplete="off" placeholder="•••" value={cardCvv} onChange={(event) => setCardCvv(event.target.value)} maxLength={4} className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
                     </div>
                   </div>
                 </section>

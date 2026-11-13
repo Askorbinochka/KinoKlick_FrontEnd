@@ -48,12 +48,20 @@ function hasPassed(ticket: Ticket) {
   return ["used", "used_up", "expired", "completed", "використано"].some((value) => status.includes(value)) || Boolean(start && new Date(start).getTime() < Date.now());
 }
 
+function getQrImageSource(value: string) {
+  if (value.startsWith("data:image/") || value.startsWith("blob:") || /^https?:\/\//i.test(value)) return value;
+  return `data:image/png;base64,${value}`;
+}
+
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hasSession, setHasSession] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [downloadedQr, setDownloadedQr] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -68,6 +76,14 @@ export default function MyTicketsPage() {
     try {
       const response = await fetch(`${API_URL}/tickets/my`, { headers: { Authorization: `Bearer ${token}` } });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        localStorage.removeItem("kinoklik-token");
+        localStorage.removeItem("kinoklik-user");
+        setHasSession(false);
+        setTickets([]);
+        window.dispatchEvent(new Event("kinoklik-auth-change"));
+        return;
+      }
       if (!response.ok) {
         const message = Array.isArray(payload.message) ? payload.message.join(" ") : payload.message;
         throw new Error(message || "Не вдалося завантажити квитки.");
@@ -81,6 +97,49 @@ export default function MyTicketsPage() {
   }, []);
 
   useEffect(() => { void loadTickets(); }, [loadTickets]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = "";
+    setDownloadedQr("");
+    setQrError("");
+    setQrLoading(false);
+
+    if (!selectedTicket || hasPassed(selectedTicket) || selectedTicket.qrCodeImage) return;
+
+    const token = localStorage.getItem("kinoklik-token");
+    setQrLoading(true);
+    void fetch(`${API_URL}/tickets/${encodeURIComponent(selectedTicket.id)}/qr-code`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(async (response) => {
+        if (response.status === 401) {
+          localStorage.removeItem("kinoklik-token");
+          localStorage.removeItem("kinoklik-user");
+          setHasSession(false);
+          window.dispatchEvent(new Event("kinoklik-auth-change"));
+          throw new Error("Сеанс входу завершився. Увійдіть знову, щоб переглянути квиток.");
+        }
+        if (!response.ok) throw new Error("Не вдалося завантажити QR-код цього квитка.");
+        const image = await response.blob();
+        if (image.type && !image.type.startsWith("image/")) throw new Error("Сервер не повернув зображення QR-коду.");
+        const nextObjectUrl = URL.createObjectURL(image);
+        if (cancelled) URL.revokeObjectURL(nextObjectUrl);
+        else {
+          objectUrl = nextObjectUrl;
+          setDownloadedQr(nextObjectUrl);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setQrError(err instanceof Error ? err.message : "Не вдалося завантажити QR-код.");
+      })
+      .finally(() => { if (!cancelled) setQrLoading(false); });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedTicket]);
 
   const { activeTickets, pastTickets } = useMemo(() => ({
     activeTickets: tickets.filter((ticket) => !hasPassed(ticket)),
@@ -163,12 +222,15 @@ export default function MyTicketsPage() {
             <p className="mt-2 text-sm text-slate-400">{dateTime(selectedTicket.session?.startTime || selectedTicket.order?.session?.startTime)}</p>
             {hasPassed(selectedTicket) ? (
               <div className="mt-6 rounded-lg bg-[#19202c] p-4"><h3 className="font-semibold">Квиток використано</h3><p className="mt-1 text-sm text-slate-400">QR-код більше не дійсний.</p></div>
-            ) : selectedTicket.qrCodeImage ? (
-              <div className="mx-auto mt-6 h-56 w-56 rounded-xl bg-white p-3"><Image src={selectedTicket.qrCodeImage} alt="QR-код квитка" width={224} height={224} unoptimized className="h-full w-full object-contain" /></div>
+            ) : selectedTicket.qrCodeImage || downloadedQr ? (
+              <div className="mx-auto mt-6 h-56 w-56 rounded-xl bg-white p-3"><Image src={getQrImageSource(selectedTicket.qrCodeImage || downloadedQr)} alt="QR-код квитка" width={224} height={224} unoptimized className="h-full w-full object-contain" /></div>
             ) : selectedTicket.qrCode ? (
-              <div className="mt-6 rounded-lg bg-white p-4 text-center text-sm text-black">QR: {selectedTicket.qrCode}</div>
+              <div className="mt-6 rounded-lg bg-[#19202c] p-4 text-center text-sm text-slate-300">
+                {qrLoading ? "Завантажуємо QR-код…" : qrError || "QR-код недоступний. Код квитка:"}
+                <p className="mt-2 break-all text-xs text-slate-400">{selectedTicket.qrCode}</p>
+              </div>
             ) : (
-              <p className="mt-6 rounded-lg bg-[#19202c] p-4 text-sm text-slate-400">QR-код для цього квитка недоступний.</p>
+              <p className="mt-6 rounded-lg bg-[#19202c] p-4 text-sm text-slate-400">{qrLoading ? "Завантажуємо QR-код…" : qrError || "QR-код для цього квитка недоступний."}</p>
             )}
             <p className="mt-4 text-center text-xs text-slate-500">№ {selectedTicket.id}</p>
             <button type="button" onClick={() => setSelectedTicket(null)} className="mt-5 w-full rounded-lg bg-[#19202c] px-4 py-3 text-sm font-semibold text-white hover:bg-[#222b39]">Закрити</button>

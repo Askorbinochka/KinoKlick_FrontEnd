@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { API_URL } from "@/app/api";
 
 type LocalUser = { name?: string; email?: string };
 
@@ -13,12 +14,49 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("kinoklik-user");
-      if (stored) setUser(JSON.parse(stored) as LocalUser);
-    } catch {
-      localStorage.removeItem("kinoklik-user");
-    }
+    let cancelled = false;
+    const syncProfile = async () => {
+      const token = localStorage.getItem("kinoklik-token");
+      if (!token) {
+        setUser(null);
+        localStorage.removeItem("kinoklik-user");
+        return;
+      }
+
+      try {
+        const stored = localStorage.getItem("kinoklik-user");
+        if (stored && !cancelled) setUser(JSON.parse(stored) as LocalUser);
+      } catch {
+        localStorage.removeItem("kinoklik-user");
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (response.status === 401) {
+          localStorage.removeItem("kinoklik-token");
+          localStorage.removeItem("kinoklik-user");
+          if (!cancelled) setUser(null);
+          return;
+        }
+        if (!response.ok) return;
+        const profile = await response.json();
+        const currentUser = {
+          name: [profile.firstName, profile.lastName].filter(Boolean).join(" "),
+          email: profile.email,
+        };
+        localStorage.setItem("kinoklik-user", JSON.stringify(currentUser));
+        if (!cancelled) setUser(currentUser);
+      } catch {
+        // Keep the cached profile visible while the API is unavailable.
+      }
+    };
+
+    void syncProfile();
+    window.addEventListener("kinoklik-auth-change", syncProfile);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("kinoklik-auth-change", syncProfile);
+    };
   }, []);
 
   const signOut = () => {
@@ -26,6 +64,7 @@ export default function Navbar() {
     localStorage.removeItem("kinoklik-token");
     setUser(null);
     setMenuOpen(false);
+    window.dispatchEvent(new Event("kinoklik-auth-change"));
     router.push("/");
   };
 

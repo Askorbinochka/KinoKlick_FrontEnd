@@ -96,9 +96,13 @@ function SeatSelectionContent() {
     setBooking(true);
     setError("");
     try {
+      const token = localStorage.getItem("kinoklik-token");
       const bookRes = await fetch(`${API_URL}/tickets/book`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           sessionId,
           seatIds: selectedSeatIds,

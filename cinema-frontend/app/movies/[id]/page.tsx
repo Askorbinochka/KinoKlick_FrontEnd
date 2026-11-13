@@ -260,9 +260,9 @@ function MovieDetailsContent() {
               </>
             ) : (
               <div className="rounded-lg border border-white/[0.05] bg-[#0d1016] px-4 py-5">
-                <p className="text-sm font-semibold text-slate-200">На цю дату сеансів немає</p>
-                <p className="mt-1 text-xs text-slate-400">Оберіть іншу дату, щоб продовжити бронювання.</p>
-                <Link href="/" className="mt-4 inline-flex rounded-lg bg-[#e3262d] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#f13a41]">До доступних сеансів</Link>
+                <p className="text-sm font-semibold text-slate-200">{sessions.length ? "На цю дату сеансів немає" : "Для цього фільму поки немає майбутніх сеансів"}</p>
+                <p className="mt-1 text-xs text-slate-400">{sessions.length ? "Оберіть іншу доступну дату, щоб продовжити бронювання." : "Розклад оновиться, коли кінотеатр додасть нові покази."}</p>
+                <Link href="/" className="mt-4 inline-flex rounded-lg bg-[#e3262d] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#f13a41]">До афіші</Link>
               </div>
             )}
 

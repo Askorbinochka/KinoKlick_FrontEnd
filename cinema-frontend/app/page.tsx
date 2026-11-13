@@ -116,6 +116,7 @@ export default function HomePage() {
   const sessionsForMovie = (movie: Movie) => sessions.filter((session) =>
     session.movieId === movie.id || session.movie?.id === movie.id
   );
+  const hasFutureSessions = sessions.some((session) => new Date(session.startTime).getTime() >= referenceTime);
 
   return (
     <div className="min-h-screen bg-[#0d1016] text-white">
@@ -125,6 +126,13 @@ export default function HomePage() {
         {featuredMovie && <HeroBanner movie={featuredMovie} />}
 
         <DateFilter dates={dateOptions} selectedDate={selectedDate} onSelect={setSelectedDate} />
+
+        {!loading && !error && movies.length > 0 && !hasFutureSessions && (
+          <section role="status" className="rounded-xl border border-white/[0.07] bg-[#121720] px-5 py-4">
+            <h2 className="text-sm font-semibold text-white">Найближчих сеансів поки немає</h2>
+            <p className="mt-1 text-xs text-slate-400">Афіша завантажена, але в розкладі немає майбутніх показів. Спробуйте пізніше.</p>
+          </section>
+        )}
 
         <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
           <h1 className="text-lg font-bold">Афіша{selectedDateTitle ? ` · ${selectedDateTitle}` : ""}</h1>

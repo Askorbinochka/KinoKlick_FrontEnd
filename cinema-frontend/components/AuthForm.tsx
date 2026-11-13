@@ -11,6 +11,9 @@ type AuthFormProps = { mode: "login" | "register" };
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const isRegister = mode === "register";
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +33,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
       const response = await fetch(`${API_URL}/auth/${isRegister ? "register" : "login"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify(isRegister
+          ? { email: email.trim(), password, firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() }
+          : { email: email.trim(), password }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -40,10 +45,25 @@ export default function AuthForm({ mode }: AuthFormProps) {
       }
 
       const token = data.access_token || data.accessToken || data.token;
-      const user = data.user || data.profile || data.account || { name: data.name || data.fullName || "", email: data.email || email };
       if (token) {
         localStorage.setItem("kinoklik-token", String(token));
-        localStorage.setItem("kinoklik-user", JSON.stringify({ name: user.name || user.fullName || "", email: user.email || email }));
+        const fallbackUser = { name: isRegister ? `${firstName.trim()} ${lastName.trim()}`.trim() : "", email: email.trim(), phone: phone.trim() };
+        localStorage.setItem("kinoklik-user", JSON.stringify(fallbackUser));
+        try {
+          const profileResponse = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+          if (profileResponse.ok) {
+            const profile = await profileResponse.json();
+            const profileUser = {
+              name: [profile.firstName, profile.lastName].filter(Boolean).join(" ") || fallbackUser.name,
+              email: profile.email || fallbackUser.email,
+              phone: profile.phone || fallbackUser.phone,
+            };
+            localStorage.setItem("kinoklik-user", JSON.stringify(profileUser));
+          }
+        } catch {
+          // The login token remains usable even if the optional profile refresh fails.
+        }
+        window.dispatchEvent(new Event("kinoklik-auth-change"));
         router.push("/tickets/my");
       } else if (isRegister) {
         router.push("/login?registered=1");
@@ -72,6 +92,20 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {registered && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-200">Акаунт створено. Тепер увійдіть.</p>}
+            {isRegister && <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="auth-first-name" className="mb-1.5 block text-sm font-medium text-slate-200">Ім’я</label>
+                <input id="auth-first-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" required className="h-11 w-full rounded-lg border border-white/[0.07] bg-[#19202c] px-3 text-sm outline-none transition focus:border-[#e3262d]" />
+              </div>
+              <div>
+                <label htmlFor="auth-last-name" className="mb-1.5 block text-sm font-medium text-slate-200">Прізвище</label>
+                <input id="auth-last-name" value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" required className="h-11 w-full rounded-lg border border-white/[0.07] bg-[#19202c] px-3 text-sm outline-none transition focus:border-[#e3262d]" />
+              </div>
+            </div>}
+            {isRegister && <div>
+              <label htmlFor="auth-phone" className="mb-1.5 block text-sm font-medium text-slate-200">Телефон</label>
+              <input id="auth-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" placeholder="+380501234567" required className="h-11 w-full rounded-lg border border-white/[0.07] bg-[#19202c] px-3 text-sm outline-none transition focus:border-[#e3262d]" />
+            </div>}
             <div>
               <label htmlFor="auth-email" className="mb-1.5 block text-sm font-medium text-slate-200">Електронна пошта</label>
               <input id="auth-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required aria-invalid={Boolean(error)} className="h-11 w-full rounded-lg border border-white/[0.07] bg-[#19202c] px-3 text-sm outline-none transition focus:border-[#e3262d] aria-[invalid=true]:border-red-500" />
