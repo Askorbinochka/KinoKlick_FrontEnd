@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { API_URL } from "@/app/api";
+import MovieSearch from "@/components/MovieSearch";
 
 type LocalUser = { name?: string; email?: string };
 
@@ -84,6 +85,10 @@ export default function Navbar() {
           <Link href="/" aria-current={pathname === "/" ? "page" : undefined} className={`transition hover:text-white ${pathname === "/" ? "text-white" : "text-slate-400"}`}>Афіша</Link>
           <Link href="/tickets/my" aria-current={pathname.startsWith("/tickets") ? "page" : undefined} className={`transition hover:text-white ${pathname.startsWith("/tickets") ? "text-white" : "text-slate-400"}`}>Мої квитки</Link>
         </nav>
+
+        <Suspense fallback={<div aria-hidden="true" className="h-9 min-w-[180px] max-w-[320px] flex-1 rounded-lg bg-[#19202c]" />}>
+          <MovieSearch />
+        </Suspense>
 
         <div className="ml-auto hidden text-[11px] text-slate-400 sm:block">Коломия</div>
 

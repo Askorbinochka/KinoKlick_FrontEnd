@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import HeroBanner from "@/components/HeroBanner";
 import DateFilter from "@/components/DateFilter";
@@ -72,7 +74,9 @@ function getDateOptions(timestamp: number): DateOption[] {
   });
 }
 
-export default function HomePage() {
+function HomePageContent() {
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search")?.trim() || "";
   const [movies, setMovies] = useState<Movie[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [referenceTime, setReferenceTime] = useState(0);
@@ -81,12 +85,13 @@ export default function HomePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState("");
 
-  const loadCatalog = useCallback(async () => {
+  const loadCatalog = useCallback(async (query: string) => {
     setLoading(true);
     setError("");
     try {
+      const moviesUrl = query ? `${API_URL}/movies?search=${encodeURIComponent(query)}` : `${API_URL}/movies`;
       const [moviesRes, sessionsRes] = await Promise.all([
-        fetch(`${API_URL}/movies`),
+        fetch(moviesUrl),
         fetch(`${API_URL}/sessions`),
       ]);
       if (!moviesRes.ok || !sessionsRes.ok) throw new Error("Не вдалося завантажити афішу.");
@@ -106,9 +111,9 @@ export default function HomePage() {
     }
   }, []);
 
-  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
+  useEffect(() => { void loadCatalog(searchQuery); }, [loadCatalog, searchQuery]);
 
-  const featuredMovie = movies[0];
+  const featuredMovie = searchQuery ? null : movies[0];
   const selectedDateLabel = dateOptions.find((date) => date.key === selectedDate)?.key;
   const selectedDateTitle = selectedDateLabel
     ? new Date(`${selectedDateLabel}T12:00:00`).toLocaleDateString("uk-UA", { day: "numeric", month: "long", timeZone: "Europe/Kyiv" })
@@ -135,7 +140,7 @@ export default function HomePage() {
         )}
 
         <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
-          <h1 className="text-lg font-bold">Афіша{selectedDateTitle ? ` · ${selectedDateTitle}` : ""}</h1>
+          <h1 className="text-lg font-bold">{searchQuery ? `Результати пошуку: «${searchQuery}»` : `Афіша${selectedDateTitle ? ` · ${selectedDateTitle}` : ""}`}</h1>
           <span className="text-xs text-slate-500">{movies.length} фільмів</span>
         </div>
         
@@ -147,10 +152,13 @@ export default function HomePage() {
           <div role="alert" className="rounded-xl border border-white/[0.07] bg-[#121720] p-8">
             <h2 className="text-lg font-bold">Не вдалося завантажити афішу</h2>
             <p className="mt-2 text-sm text-slate-400">Перевірте з’єднання та спробуйте ще раз. {error}</p>
-            <button type="button" onClick={() => void loadCatalog()} className="mt-5 rounded-lg bg-[#e3262d] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#f13a41]">Спробувати знову</button>
+            <button type="button" onClick={() => void loadCatalog(searchQuery)} className="mt-5 rounded-lg bg-[#e3262d] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#f13a41]">Спробувати знову</button>
           </div>
         ) : movies.length === 0 ? (
-          <div className="py-16 text-center text-sm text-slate-400">Фільмів поки немає.</div>
+          <div className="rounded-xl border border-white/[0.07] bg-[#121720] px-6 py-12 text-center">
+            <p className="text-sm text-slate-300">{searchQuery ? `За запитом «${searchQuery}» фільмів не знайдено.` : "Фільмів поки немає."}</p>
+            {searchQuery && <Link href="/" className="mt-4 inline-block rounded-lg bg-[#19202c] px-4 py-2 text-xs font-semibold text-white hover:bg-[#222b39]">Показати всі фільми</Link>}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
             {movies.map((movie) => (
@@ -160,5 +168,13 @@ export default function HomePage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0d1016] text-white"><Navbar /><main aria-label="Завантажуємо афішу" className="mx-auto max-w-[1200px] px-6 py-12 text-sm text-slate-400">Завантажуємо афішу…</main></div>}>
+      <HomePageContent />
+    </Suspense>
   );
 }
