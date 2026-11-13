@@ -25,7 +25,7 @@ export default function MovieSearch() {
   return (
     <form onSubmit={submitSearch} role="search" className="flex h-9 min-w-[180px] max-w-[320px] flex-1 items-center rounded-lg border border-white/[0.07] bg-[#19202c] px-3 transition focus-within:border-slate-500">
       <input
-        type="search"
+        type="text"
         aria-label="Пошук фільмів за назвою або описом"
         value={query}
         onChange={(event) => setQuery(event.target.value)}

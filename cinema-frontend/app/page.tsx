@@ -141,7 +141,7 @@ function HomePageContent() {
 
         <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
           <h1 className="text-lg font-bold">{searchQuery ? `Результати пошуку: «${searchQuery}»` : `Афіша${selectedDateTitle ? ` · ${selectedDateTitle}` : ""}`}</h1>
-          <span className="text-xs text-slate-500">{movies.length} фільмів</span>
+          <Link href="/" className="text-xs font-medium text-slate-400 transition hover:text-white">Усі фільми</Link>
         </div>
         
         {loading ? (
@@ -157,7 +157,6 @@ function HomePageContent() {
         ) : movies.length === 0 ? (
           <div className="rounded-xl border border-white/[0.07] bg-[#121720] px-6 py-12 text-center">
             <p className="text-sm text-slate-300">{searchQuery ? `За запитом «${searchQuery}» фільмів не знайдено.` : "Фільмів поки немає."}</p>
-            {searchQuery && <Link href="/" className="mt-4 inline-block rounded-lg bg-[#19202c] px-4 py-2 text-xs font-semibold text-white hover:bg-[#222b39]">Показати всі фільми</Link>}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
