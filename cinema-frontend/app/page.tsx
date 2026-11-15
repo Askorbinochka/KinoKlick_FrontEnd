@@ -145,7 +145,7 @@ function HomePageContent() {
         </div>
         
         {loading ? (
-          <div aria-label="Завантаження афіші" className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+          <div aria-label="Завантаження афіші" className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
             {[0, 1, 2, 3].map((item) => <div key={item} className="overflow-hidden rounded-xl border border-white/[0.05] bg-[#121720] p-3"><div className="aspect-[2/3] animate-pulse rounded-lg bg-[#1b2230]" /><div className="mt-3 h-3 w-3/4 animate-pulse rounded bg-[#1b2230]" /><div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-[#1b2230]" /></div>)}
           </div>
         ) : error ? (
@@ -159,7 +159,7 @@ function HomePageContent() {
             <p className="text-sm text-slate-300">{searchQuery ? `За запитом «${searchQuery}» фільмів не знайдено.` : "Фільмів поки немає."}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
             {movies.map((movie) => (
               <MovieCard key={movie.id} movie={movie} sessions={sessionsForMovie(movie)} selectedDate={selectedDate} referenceTime={referenceTime} />
             ))}

@@ -177,6 +177,7 @@ function MovieDetailsContent() {
                 src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}
                 alt={`Постер фільму «${movie.title}»`}
                 fill
+                preload
                 sizes="(max-width: 768px) 100vw, 260px"
                 className="object-cover"
               />
