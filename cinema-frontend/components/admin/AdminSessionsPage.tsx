@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { API_URL } from "@/app/api";
@@ -43,6 +43,8 @@ type Session = {
 };
 
 type Hall = { id: string; name: string };
+type SessionEditor = { mode: "create" } | { mode: "edit"; session: Session } | null;
+type SessionForm = { movieId: string; date: string; time: string; hallId: string; price: string };
 
 const KYIV = "Europe/Kyiv";
 const HOUR_HEIGHT = 64;
@@ -92,6 +94,30 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function kyivDateTime(date: string, time: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const target = Date.UTC(year, month - 1, day, hour, minute);
+  let candidate = new Date(target);
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: KYIV,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(formatter.formatToParts(candidate).map((part) => [part.type, part.value]));
+    const shownAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+    candidate = new Date(candidate.getTime() + target - shownAsUtc);
+  }
+  const finalParts = Object.fromEntries(formatter.formatToParts(candidate).map((part) => [part.type, part.value]));
+  if (Number(finalParts.year) !== year || Number(finalParts.month) !== month || Number(finalParts.day) !== day || Number(finalParts.hour) !== hour || Number(finalParts.minute) !== minute) return null;
+  return candidate;
+}
+
 function timeInMinutes(value: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: KYIV,
@@ -130,6 +156,7 @@ function ListIcon() {
 export default function AdminSessionsPage() {
   const router = useRouter();
   const [access, setAccess] = useState<"checking" | "allowed" | "denied" | "error">("checking");
+  const [userRole, setUserRole] = useState("");
   const [accessError, setAccessError] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -140,6 +167,14 @@ export default function AdminSessionsPage() {
   const [movieFilter, setMovieFilter] = useState("");
   const [hallFilter, setHallFilter] = useState("");
   const [calendarDate, setCalendarDate] = useState(() => dateKey(new Date()));
+  const [editor, setEditor] = useState<SessionEditor>(null);
+  const [form, setForm] = useState<SessionForm>({ movieId: "", date: dateKey(new Date()), time: "", hallId: "", price: "" });
+  const [saving, setSaving] = useState(false);
+  const [mutationError, setMutationError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [deleting, setDeleting] = useState<Session | null>(null);
+  const [deletingNow, setDeletingNow] = useState(false);
+  const [actionsFor, setActionsFor] = useState("");
 
   const checkAccess = useCallback(async () => {
     setAccess("checking");
@@ -163,6 +198,7 @@ export default function AdminSessionsPage() {
 
       const profile = await response.json() as { role?: string };
       const role = profile.role?.toUpperCase();
+      setUserRole(role || "");
       setAccess(role === "ADMIN" || role === "MODERATOR" ? "allowed" : "denied");
     } catch (error) {
       setAccessError(error instanceof Error ? error.message : "Не вдалося перевірити права доступу.");
@@ -259,6 +295,89 @@ export default function AdminSessionsPage() {
     setHallFilter("");
   };
 
+  const openCreate = () => {
+    setMutationError("");
+    setNotice("");
+    setForm({ movieId: idOf(movies[0]?.id ?? movies[0]?._id), date: dateKey(new Date()), time: "", hallId: halls[0]?.id || "", price: "150" });
+    setEditor({ mode: "create" });
+  };
+
+  const openEdit = (session: Session) => {
+    setMutationError("");
+    setNotice("");
+    setForm({ movieId: session.movieId, date: dateKey(session.startTime), time: formatTime(session.startTime), hallId: session.hallId, price: session.price == null ? "" : String(session.price) });
+    setEditor({ mode: "edit", session });
+    setActionsFor("");
+  };
+
+  const saveSession = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMutationError("");
+    const price = Number(form.price);
+    if (!form.movieId || !form.hallId || !form.date || !form.time || !Number.isFinite(price) || price <= 0) {
+      setMutationError("Заповни всі поля. Ціна має бути більшою за 0.");
+      return;
+    }
+    const start = kyivDateTime(form.date, form.time);
+    if (!start || start.getTime() <= Date.now()) {
+      setMutationError("Дата й час сеансу мають бути в майбутньому.");
+      return;
+    }
+    const token = localStorage.getItem("kinoklik-token");
+    if (!token) {
+      router.replace(`/login?next=${encodeURIComponent("/admin/sessions")}`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const isEdit = editor?.mode === "edit";
+      const response = await fetch(`${API_URL}/sessions${isEdit ? `/${encodeURIComponent(editor.session.id)}` : ""}`, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ startTime: start.toISOString(), movieId: form.movieId, hallId: form.hallId, price }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { message?: string | string[]; error?: string } | null;
+        const message = Array.isArray(payload?.message) ? payload.message.join(" ") : payload?.message || payload?.error;
+        throw new Error(message || (response.status === 403 ? "У цього акаунта немає прав для цієї дії." : "Не вдалося зберегти сеанс. Перевір дані й спробуй ще раз."));
+      }
+      setEditor(null);
+      setNotice(isEdit ? "Сеанс успішно оновлено." : "Сеанс успішно створено.");
+      await loadSchedule();
+    } catch (saveError) {
+      setMutationError(saveError instanceof Error ? saveError.message : "Не вдалося зберегти сеанс.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSession = async () => {
+    if (!deleting || userRole !== "ADMIN") return;
+    const token = localStorage.getItem("kinoklik-token");
+    if (!token) {
+      router.replace(`/login?next=${encodeURIComponent("/admin/sessions")}`);
+      return;
+    }
+    setDeletingNow(true);
+    setMutationError("");
+    try {
+      const response = await fetch(`${API_URL}/sessions/${encodeURIComponent(deleting.id)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { message?: string | string[]; error?: string } | null;
+        const message = Array.isArray(payload?.message) ? payload.message.join(" ") : payload?.message || payload?.error;
+        throw new Error(message || "Не вдалося видалити сеанс.");
+      }
+      setDeleting(null);
+      setNotice("Сеанс видалено з розкладу.");
+      await loadSchedule();
+    } catch (deleteError) {
+      setMutationError(deleteError instanceof Error ? deleteError.message : "Не вдалося видалити сеанс.");
+    } finally {
+      setDeletingNow(false);
+    }
+  };
+
   if (access === "checking") {
     return <div className="grid min-h-screen place-items-center bg-[#0b0e13] px-5 text-sm text-slate-400">Перевіряємо доступ до адмін-панелі…</div>;
   }
@@ -319,10 +438,12 @@ export default function AdminSessionsPage() {
               <h1 className="text-2xl font-bold tracking-tight sm:text-[30px]">Розклад сеансів</h1>
               <p className="mt-2 text-sm text-slate-400">Створюйте сеанси та керуйте запланованими показами.</p>
             </div>
-            <button type="button" disabled title="Підключимо після уточнення полів API сеансів і списку залів" className="h-11 cursor-not-allowed rounded-lg bg-[#e3262d]/50 px-5 text-sm font-semibold text-white/70 opacity-80">
+            <button type="button" onClick={openCreate} disabled={movies.length === 0 || halls.length === 0} title={halls.length === 0 ? "У розкладі ще немає залів, з яких можна вибрати" : undefined} className="h-11 rounded-lg bg-[#e3262d] px-5 text-sm font-semibold text-white transition hover:bg-[#f13a41] disabled:cursor-not-allowed disabled:bg-[#e3262d]/40 disabled:text-white/60">
               <span aria-hidden="true" className="mr-2">＋</span>Додати сеанс
             </button>
           </div>
+
+          {notice && <div role="status" className="mt-4 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"><span>✓　{notice}</span><button type="button" onClick={() => setNotice("")} aria-label="Закрити повідомлення">×</button></div>}
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <div role="group" aria-label="Вигляд розкладу" className="inline-flex rounded-lg border border-white/[0.08] bg-[#111620] p-1">
@@ -389,7 +510,7 @@ export default function AdminSessionsPage() {
               <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-12 text-center">
                 <span className="grid h-14 w-14 place-items-center rounded-xl bg-[#202a38] text-2xl text-slate-300">—</span>
                 <h2 className="mt-7 text-xl font-bold">Сеансів ще немає</h2>
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">Коли розклад з’явиться в системі, він відобразиться тут.</p>
+                <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">{halls.length === 0 ? "Щоб додати перший сеанс, потрібен список залів від бекенду. Поки що API повертає зали лише разом із сеансами." : "Додай перший сеанс, щоб почати формувати розклад показів у кінотеатрі."}</p>
               </div>
             ) : view === "list" ? (
               <div>
@@ -400,8 +521,8 @@ export default function AdminSessionsPage() {
                   </div>
                 ) : (
                   <>
-                    {upcoming.length > 0 && <SessionTable title="Усі сеанси" count={upcoming.length} sessions={upcoming} now={now} />}
-                    {past.length > 0 && <SessionTable title="Минулі сеанси" count={past.length} sessions={past} now={now} past />}
+                    {upcoming.length > 0 && <SessionTable title="Усі сеанси" count={upcoming.length} sessions={upcoming} now={now} canDelete={userRole === "ADMIN"} actionsFor={actionsFor} onToggleActions={(id) => setActionsFor((current) => current === id ? "" : id)} onEdit={openEdit} onDelete={(session) => { setMutationError(""); setDeleting(session); setActionsFor(""); }} />}
+                    {past.length > 0 && <SessionTable title="Минулі сеанси" count={past.length} sessions={past} now={now} past canDelete={userRole === "ADMIN"} actionsFor={actionsFor} onToggleActions={(id) => setActionsFor((current) => current === id ? "" : id)} onEdit={openEdit} onDelete={(session) => { setMutationError(""); setDeleting(session); setActionsFor(""); }} />}
                   </>
                 )}
               </div>
@@ -433,11 +554,11 @@ export default function AdminSessionsPage() {
                               const start = Math.max(0, Math.min(HOUR_HEIGHT * HOURS.length - 50, (timeInMinutes(session.startTime) - FIRST_HOUR * 60) / 60 * HOUR_HEIGHT));
                               const height = Math.max(54, Math.min(180, session.duration / 60 * HOUR_HEIGHT));
                               return (
-                                <article key={session.id} className="absolute inset-x-2 z-[1] overflow-hidden rounded-lg border border-slate-600 bg-[#202b3a] p-3 shadow-sm before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-[#e3262d]" style={{ top: start + 5, height }}>
+                                <button type="button" key={session.id} onClick={() => openEdit(session)} aria-label={`Редагувати сеанс ${session.movieTitle}, ${formatTime(session.startTime)}`} className="absolute inset-x-2 z-[1] overflow-hidden rounded-lg border border-slate-600 bg-[#202b3a] p-3 text-left shadow-sm before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-[#e3262d] hover:border-slate-400" style={{ top: start + 5, height }}>
                                   <p className="text-xs font-bold">{formatTime(session.startTime)}</p>
                                   <p className="mt-2 line-clamp-2 text-xs font-medium text-white">{session.movieTitle}</p>
                                   <p className="mt-2 text-[10px] text-slate-400">{session.price == null ? "Ціну не вказано" : `${session.price} грн`} · {normalizedStatus(session, now)}</p>
-                                </article>
+                                </button>
                               );
                             })}
                           </div>
@@ -451,11 +572,59 @@ export default function AdminSessionsPage() {
           </section>
         </main>
       </div>
+
+      {editor && (
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/65" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setEditor(null); }}>
+          <form onSubmit={saveSession} className="flex h-full w-full max-w-[480px] flex-col border-l border-[#26303d] bg-[#121720] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="session-editor-title">
+            <div className="flex items-start justify-between border-b border-[#26303d] px-6 py-6 sm:px-8">
+              <div><h2 id="session-editor-title" className="text-xl font-bold">{editor.mode === "create" ? "Новий сеанс" : "Редагувати сеанс"}</h2><p className="mt-2 text-sm text-slate-400">{editor.mode === "create" ? "Додайте показ фільму до розкладу." : editor.session.movieTitle}</p></div>
+              <button type="button" onClick={() => setEditor(null)} disabled={saving} aria-label="Закрити" className="h-10 w-10 rounded-lg border border-[#283241] text-slate-300 hover:bg-[#202a38]">×</button>
+            </div>
+            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6 sm:px-8">
+              <p className="text-xs text-slate-500">Усі поля обов’язкові</p>
+              {mutationError && <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{mutationError}</div>}
+              <label className="block text-sm font-medium">Фільм *<select required value={form.movieId} onChange={(event) => setForm({ ...form, movieId: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500"><option value="">Оберіть фільм</option>{movies.map((movie, index) => { const id = idOf(movie.id ?? movie._id); return id ? <option key={id} value={id}>{movie.title || `Фільм ${index + 1}`}</option> : null; })}</select></label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block text-sm font-medium">Дата *<input required type="date" min={dateKey(new Date())} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500" /></label>
+                <label className="block text-sm font-medium">Час початку *<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500" /></label>
+              </div>
+              <p className="-mt-3 text-xs text-slate-500">Час вводиться за київським часом.</p>
+              <label className="block text-sm font-medium">Зал *<select required value={form.hallId} onChange={(event) => setForm({ ...form, hallId: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500"><option value="">Оберіть зал</option>{halls.map((hall) => <option key={hall.id} value={hall.id}>{hall.name}</option>)}</select></label>
+              <label className="block text-sm font-medium">Ціна квитка, грн *<input required min="1" step="1" type="number" inputMode="numeric" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Наприклад, 150" className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500" /></label>
+              <div className="rounded-lg bg-[#19202c] p-4 text-xs leading-5 text-slate-400">Перед збереженням перевір фільм, дату, час і зал. Сеанс не можна запланувати в минулому.</div>
+            </div>
+            <div className="flex gap-3 border-t border-[#26303d] px-6 py-5 sm:px-8"><button type="button" disabled={saving} onClick={() => setEditor(null)} className="h-11 rounded-lg border border-[#283241] px-5 text-sm font-medium hover:bg-[#202a38] disabled:opacity-50">Скасувати</button><button type="submit" disabled={saving || movies.length === 0 || halls.length === 0} className="h-11 flex-1 rounded-lg bg-[#e3262d] px-5 text-sm font-semibold text-white hover:bg-[#f13a41] disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Зберігаємо…" : editor.mode === "create" ? "Зберегти сеанс" : "Зберегти зміни"}</button></div>
+          </form>
+        </div>
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-session-title" className="w-full max-w-lg rounded-xl border border-[#303b4c] bg-[#121720] p-6 shadow-2xl sm:p-7">
+            <div className="flex items-start justify-between"><div><span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-500/15 text-xl font-bold text-rose-300">!</span><h2 id="delete-session-title" className="mt-5 text-xl font-bold">Видалити сеанс?</h2></div><button type="button" onClick={() => setDeleting(null)} disabled={deletingNow} aria-label="Закрити" className="h-10 w-10 rounded-lg border border-[#283241] text-slate-300">×</button></div>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Цю дію не можна скасувати. Сеанс буде видалено з розкладу кінотеатру.</p>
+            <div className="mt-5 rounded-lg border border-[#283241] bg-[#0d1118] p-4"><p className="font-semibold">{deleting.movieTitle}</p><p className="mt-2 text-sm text-slate-400">{formatDate(deleting.startTime, { day: "numeric", month: "long", year: "numeric" })} · {formatTime(deleting.startTime)} · {deleting.hallName}</p></div>
+            {mutationError && <p role="alert" className="mt-4 text-sm text-rose-300">{mutationError}</p>}
+            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setDeleting(null)} disabled={deletingNow} className="h-11 rounded-lg border border-[#283241] px-5 text-sm hover:bg-[#202a38]">Скасувати</button><button type="button" onClick={() => void deleteSession()} disabled={deletingNow} className="h-11 rounded-lg bg-[#e3262d] px-5 text-sm font-semibold text-white hover:bg-[#f13a41] disabled:opacity-50">{deletingNow ? "Видаляємо…" : "Видалити сеанс"}</button></div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
 
-function SessionTable({ title, count, sessions, now, past = false }: { title: string; count: number; sessions: Session[]; now: number; past?: boolean }) {
+function SessionTable({ title, count, sessions, now, past = false, canDelete, actionsFor, onToggleActions, onEdit, onDelete }: {
+  title: string;
+  count: number;
+  sessions: Session[];
+  now: number;
+  past?: boolean;
+  canDelete: boolean;
+  actionsFor: string;
+  onToggleActions: (id: string) => void;
+  onEdit: (session: Session) => void;
+  onDelete: (session: Session) => void;
+}) {
   return (
     <section className={past ? "border-t-4 border-[#0b0e13]" : ""}>
       <div className="flex items-center justify-between border-b border-[#26303d] px-5 py-4">
@@ -482,7 +651,10 @@ function SessionTable({ title, count, sessions, now, past = false }: { title: st
                 <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-300">{session.hallName}</td>
                 <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-300">{session.price == null ? "—" : `${session.price} грн`}</td>
                 <td className="px-5 py-4"><StatusBadge label={normalizedStatus(session, now)} /></td>
-                <td className="px-5 py-4 text-xs text-slate-500">—</td>
+                <td className="relative px-5 py-4 text-xs">
+                  <button type="button" onClick={() => onToggleActions(session.id)} aria-label={`Дії для сеансу ${session.movieTitle}`} aria-expanded={actionsFor === session.id} className="h-10 w-10 rounded-lg border border-[#283241] bg-[#171e29] text-base text-slate-300 hover:bg-[#202a38]">···</button>
+                  {actionsFor === session.id && <div className="absolute right-5 top-14 z-10 min-w-36 rounded-lg border border-[#303b4c] bg-[#1b2330] p-1.5 shadow-xl"><button type="button" onClick={() => onEdit(session)} className="block w-full rounded-md px-3 py-2 text-left text-sm text-slate-100 hover:bg-[#283241]">Редагувати</button>{canDelete && <button type="button" onClick={() => onDelete(session)} className="block w-full rounded-md px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/10">Видалити</button>}</div>}
+                </td>
               </tr>
             ))}
           </tbody>
