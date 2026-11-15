@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { API_URL } from "@/app/api";
 import MovieSearch from "@/components/MovieSearch";
 
-type LocalUser = { name?: string; email?: string };
+type LocalUser = { name?: string; email?: string; role?: string };
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -44,6 +44,7 @@ export default function Navbar() {
         const currentUser = {
           name: [profile.firstName, profile.lastName].filter(Boolean).join(" "),
           email: profile.email,
+          role: profile.role,
         };
         localStorage.setItem("kinoklik-user", JSON.stringify(currentUser));
         if (!cancelled) setUser(currentUser);
@@ -104,6 +105,7 @@ export default function Navbar() {
                   <p className="truncate text-xs text-slate-400">{user.email}</p>
                 </div>
                 <Link role="menuitem" href="/tickets/my" onClick={() => setMenuOpen(false)} className="mt-2 block rounded-lg bg-[#19202c] px-3 py-2.5 text-sm text-slate-200 hover:text-white">Мої квитки</Link>
+                {["ADMIN", "MODERATOR"].includes(user.role?.toUpperCase() || "") && <Link role="menuitem" href="/admin/sessions" onClick={() => setMenuOpen(false)} className="mt-1 block rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Адмін-панель</Link>}
                 <button role="menuitem" type="button" onClick={signOut} className="mt-1 w-full rounded-lg px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Вийти</button>
               </div>
             )}

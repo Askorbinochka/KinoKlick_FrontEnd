@@ -21,19 +21,48 @@ type Ticket = {
 };
 
 function extractTickets(payload: unknown): Ticket[] {
-  if (Array.isArray(payload)) return payload as Ticket[];
-  if (!payload || typeof payload !== "object") return [];
-  const data = payload as Record<string, unknown>;
-  const collection = [data.tickets, data.orders, data.items, data.data].find(Array.isArray) as unknown[] | undefined;
-  if (!collection) return [];
-  return collection.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const record = item as Record<string, unknown>;
-    if (Array.isArray(record.tickets)) {
-      return (record.tickets as Ticket[]).map((ticket) => ({ ...ticket, order: (ticket.order || record) as Ticket["order"] }));
+  const tickets: Ticket[] = [];
+  const seen = new Set<string>();
+
+  const visit = (value: unknown, parentOrder?: Record<string, unknown>, depth = 0) => {
+    if (depth > 8 || value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, parentOrder, depth + 1));
+      return;
     }
-    return [record as Ticket];
-  });
+    if (typeof value !== "object") return;
+
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.tickets)) {
+      const order = record.order && typeof record.order === "object"
+        ? record.order as Record<string, unknown>
+        : record.totalAmount != null || record.customerName != null || record.status != null
+          ? record
+          : parentOrder;
+      visit(record.tickets, order, depth + 1);
+      return;
+    }
+
+    if (record.qrCode || record.qrCodeImage || record.seat || record.seatNumber != null) {
+      const ticket = {
+        ...record,
+        order: (record.order || parentOrder) as Ticket["order"],
+      } as Ticket;
+      const key = ticket.id || ticket.qrCode || `${ticket.seat?.row ?? ticket.row}-${ticket.seat?.number ?? ticket.seatNumber}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        tickets.push(ticket);
+      }
+      return;
+    }
+
+    for (const key of ["ticket", "items", "order", "orders", "data", "results"]) {
+      if (record[key] != null) visit(record[key], parentOrder, depth + 1);
+    }
+  };
+
+  visit(payload);
+  return tickets;
 }
 
 function dateTime(value?: string) {

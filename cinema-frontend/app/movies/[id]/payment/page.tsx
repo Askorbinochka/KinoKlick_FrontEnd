@@ -195,8 +195,8 @@ function PaymentContent() {
 
               <form onSubmit={handleConfirm} className="space-y-4">
                 <section className="space-y-4">
-                  <h2 className="text-sm font-semibold text-white">Банківська картка · демо</h2>
-                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-xs leading-5 text-amber-100/80">Це демонстраційне оформлення: справжній платіж не виконується. Номер картки, термін дії та CVV не надсилаються бекенду й не зберігаються. Сервер підтверджує бронювання за контактними даними.</p>
+                  <h2 className="text-sm font-semibold text-white">Банківська картка</h2>
+                  <p className="text-xs leading-5 text-slate-400">Після підтвердження замовлення електронні квитки будуть сформовані для цього бронювання.</p>
                   <div>
                     <label htmlFor="card-holder" className="mb-1 block text-xs text-slate-400">ІМ’Я КЛІЄНТА</label>
                     <input id="card-holder" type="text" autoComplete="cc-name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-red-500" />
@@ -286,7 +286,7 @@ function PaymentContent() {
           <div className="max-w-2xl mx-auto space-y-6 py-4">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-green-500/20 border border-green-500/40 text-green-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
-              <h1 className="text-2xl font-bold">Оплата пройшла успішно!</h1>
+              <h1 className="text-2xl font-bold">Замовлення підтверджено</h1>
               <p className="text-sm text-gray-400">Квитки сформовано. Збережіть QR-коди або покажіть їх під час входу.</p>
               <p className="text-sm text-gray-400">Email для замовлення: <span className="text-white">{customerEmail}</span></p>
       

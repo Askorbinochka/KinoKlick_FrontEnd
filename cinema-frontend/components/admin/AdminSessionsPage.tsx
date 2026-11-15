@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { API_URL } from "@/app/api";
 
 type Movie = {
@@ -127,6 +128,9 @@ function ListIcon() {
 }
 
 export default function AdminSessionsPage() {
+  const router = useRouter();
+  const [access, setAccess] = useState<"checking" | "allowed" | "denied" | "error">("checking");
+  const [accessError, setAccessError] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,6 +140,35 @@ export default function AdminSessionsPage() {
   const [movieFilter, setMovieFilter] = useState("");
   const [hallFilter, setHallFilter] = useState("");
   const [calendarDate, setCalendarDate] = useState(() => dateKey(new Date()));
+
+  const checkAccess = useCallback(async () => {
+    setAccess("checking");
+    setAccessError("");
+    const token = localStorage.getItem("kinoklik-token");
+    if (!token) {
+      router.replace(`/login?next=${encodeURIComponent("/admin/sessions")}`);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.status === 401) {
+        localStorage.removeItem("kinoklik-token");
+        localStorage.removeItem("kinoklik-user");
+        window.dispatchEvent(new Event("kinoklik-auth-change"));
+        router.replace(`/login?next=${encodeURIComponent("/admin/sessions")}`);
+        return;
+      }
+      if (!response.ok) throw new Error("Не вдалося перевірити права доступу. Спробуйте ще раз.");
+
+      const profile = await response.json() as { role?: string };
+      const role = profile.role?.toUpperCase();
+      setAccess(role === "ADMIN" || role === "MODERATOR" ? "allowed" : "denied");
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "Не вдалося перевірити права доступу.");
+      setAccess("error");
+    }
+  }, [router]);
 
   const loadSchedule = useCallback(async () => {
     setLoading(true);
@@ -181,7 +214,8 @@ export default function AdminSessionsPage() {
     }
   }, []);
 
-  useEffect(() => { void loadSchedule(); }, [loadSchedule]);
+  useEffect(() => { void checkAccess(); }, [checkAccess]);
+  useEffect(() => { if (access === "allowed") void loadSchedule(); }, [access, loadSchedule]);
 
   const movieNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -224,6 +258,34 @@ export default function AdminSessionsPage() {
     setMovieFilter("");
     setHallFilter("");
   };
+
+  if (access === "checking") {
+    return <div className="grid min-h-screen place-items-center bg-[#0b0e13] px-5 text-sm text-slate-400">Перевіряємо доступ до адмін-панелі…</div>;
+  }
+
+  if (access === "denied") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#0b0e13] px-5 text-slate-100">
+        <section className="w-full max-w-md rounded-xl border border-[#26303d] bg-[#121720] p-7 text-center">
+          <h1 className="text-xl font-bold">Немає доступу до адмін-панелі</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-400">Для керування розкладом потрібна роль адміністратора або модератора. Увійди в акаунт із відповідними правами.</p>
+          <Link href="/" className="mt-6 inline-flex rounded-lg bg-[#19202c] px-5 py-3 text-sm font-semibold text-white hover:bg-[#222b39]">Повернутися до афіші</Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (access === "error") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#0b0e13] px-5 text-slate-100">
+        <section role="alert" className="w-full max-w-md rounded-xl border border-[#26303d] bg-[#121720] p-7 text-center">
+          <h1 className="text-xl font-bold">Не вдалося перевірити доступ</h1>
+          <p className="mt-3 text-sm text-slate-400">{accessError}</p>
+          <button type="button" onClick={() => void checkAccess()} className="mt-6 rounded-lg bg-[#e3262d] px-5 py-3 text-sm font-semibold text-white hover:bg-[#f13a41]">Спробувати ще раз</button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0e13] text-slate-100">

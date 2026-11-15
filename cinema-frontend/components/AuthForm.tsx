@@ -57,6 +57,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
               name: [profile.firstName, profile.lastName].filter(Boolean).join(" ") || fallbackUser.name,
               email: profile.email || fallbackUser.email,
               phone: profile.phone || fallbackUser.phone,
+              role: profile.role,
             };
             localStorage.setItem("kinoklik-user", JSON.stringify(profileUser));
           }
@@ -64,7 +65,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
           // The login token remains usable even if the optional profile refresh fails.
         }
         window.dispatchEvent(new Event("kinoklik-auth-change"));
-        router.push("/tickets/my");
+        const requestedPath = new URLSearchParams(window.location.search).get("next");
+        const destination = requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+          ? requestedPath
+          : "/tickets/my";
+        router.push(destination);
       } else if (isRegister) {
         router.push("/login?registered=1");
       } else {
