@@ -166,12 +166,12 @@ function MovieDetailsContent() {
     <div className="min-h-screen bg-[#0d1016] text-white">
       <Navbar />
       <main className="mx-auto w-full max-w-[1160px] space-y-6 px-4 py-5 sm:px-6 lg:px-8">
-        <nav className="flex items-center gap-2 text-xs text-slate-500" aria-label="Навігаційний ланцюжок">
-          <Link href="/" className="hover:text-white">Фільми</Link><span>/</span><span className="text-slate-200">{movie.title}</span>
+        <nav className="flex min-w-0 items-center gap-2 text-xs text-slate-500" aria-label="Навігаційний ланцюжок">
+          <Link href="/" className="shrink-0 hover:text-white">Фільми</Link><span aria-hidden="true">/</span><span className="min-w-0 truncate text-slate-200">{movie.title}</span>
         </nav>
 
-        <section className="grid gap-6 md:grid-cols-[260px_1fr] lg:gap-8">
-          <div className="space-y-3">
+        <section className="grid gap-6 sm:grid-cols-[180px_minmax(0,1fr)] md:grid-cols-[260px_1fr] lg:gap-8">
+          <div className="mx-auto w-full max-w-[220px] space-y-3 sm:mx-0 sm:max-w-none">
             <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
               <Image
                 src={movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=600"}

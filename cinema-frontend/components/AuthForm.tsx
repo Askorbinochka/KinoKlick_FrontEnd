@@ -85,7 +85,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
   return (
     <div className="min-h-screen bg-[#0d1016] text-white">
       <Navbar />
-      <main className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[1200px] flex-col items-center px-5 pb-16 pt-20">
+      <main className="mx-auto flex min-h-[calc(100vh-88px)] w-full max-w-[1200px] flex-col items-center px-4 pb-10 pt-8 sm:px-5 sm:pb-16 sm:pt-12 md:min-h-[calc(100vh-48px)] md:pt-20">
         <section className="w-full max-w-[420px] rounded-xl border border-white/[0.07] bg-[#121720] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-8">
           <h1 className="text-2xl font-bold tracking-tight">{isRegister ? "Створіть акаунт" : "З поверненням!"}</h1>
           <p className="mt-2 text-sm text-slate-400">{isRegister ? "Зберігайте оплачені квитки в одному місці." : "Увійдіть, щоб переглядати свої квитки."}</p>

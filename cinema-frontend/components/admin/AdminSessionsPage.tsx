@@ -584,7 +584,7 @@ export default function AdminSessionsPage() {
               <p className="text-xs text-slate-500">Усі поля обов’язкові</p>
               {mutationError && <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{mutationError}</div>}
               <label className="block text-sm font-medium">Фільм *<select required value={form.movieId} onChange={(event) => setForm({ ...form, movieId: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500"><option value="">Оберіть фільм</option>{movies.map((movie, index) => { const id = idOf(movie.id ?? movie._id); return id ? <option key={id} value={id}>{movie.title || `Фільм ${index + 1}`}</option> : null; })}</select></label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2">
                 <label className="block text-sm font-medium">Дата *<input required type="date" min={dateKey(new Date())} value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500" /></label>
                 <label className="block text-sm font-medium">Час початку *<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 h-11 w-full rounded-lg border border-[#283241] bg-[#0d1118] px-3 text-sm text-white outline-none focus:border-slate-500" /></label>
               </div>

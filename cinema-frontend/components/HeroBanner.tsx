@@ -10,7 +10,7 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
   const imageUrl = movie.posterUrl || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1200";
 
   return (
-    <section className="relative flex min-h-[360px] items-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#121720] shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:min-h-[430px]">
+    <section className="relative flex min-h-[310px] items-center overflow-hidden rounded-xl border border-white/[0.07] bg-[#121720] shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:min-h-[430px]">
   
       <div className="absolute inset-0 z-0">
         <Image

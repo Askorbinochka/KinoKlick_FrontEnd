@@ -23,7 +23,7 @@ export default function MovieSearch() {
   };
 
   return (
-    <form onSubmit={submitSearch} role="search" className="flex h-9 min-w-[180px] max-w-[320px] flex-1 items-center rounded-lg border border-white/[0.07] bg-[#19202c] px-3 transition focus-within:border-slate-500">
+    <form onSubmit={submitSearch} role="search" className="flex h-9 w-full min-w-0 items-center rounded-lg border border-white/[0.07] bg-[#19202c] px-3 transition focus-within:border-slate-500 md:min-w-[150px] md:max-w-[320px] md:flex-1">
       <input
         type="text"
         aria-label="Пошук фільмів за назвою або описом"
