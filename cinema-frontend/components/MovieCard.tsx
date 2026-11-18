@@ -55,6 +55,7 @@ export default function MovieCard({ movie, sessions, selectedDate, referenceTime
             src={imageUrl}
             alt={`Постер фільму «${movie.title}»`}
             fill
+            unoptimized
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition duration-300 group-hover:scale-[1.03]"
           />

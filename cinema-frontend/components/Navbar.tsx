@@ -113,7 +113,10 @@ export default function Navbar() {
                   <p className="truncate text-xs text-slate-400">{user.email}</p>
                 </div>
                 <Link role="menuitem" href="/tickets/my" onClick={() => setMenuOpen(false)} className="mt-2 block rounded-lg bg-[#19202c] px-3 py-2.5 text-sm text-slate-200 hover:text-white">Мої квитки</Link>
-                {["ADMIN", "MODERATOR"].includes(user.role?.toUpperCase() || "") && <Link role="menuitem" href="/admin/sessions" onClick={() => setMenuOpen(false)} className="mt-1 block rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Адмін-панель</Link>}
+                {["ADMIN", "MODERATOR"].includes(user.role?.toUpperCase() || "") && <>
+                  <Link role="menuitem" href="/admin/sessions" onClick={() => setMenuOpen(false)} className="mt-1 block rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Адмін-панель</Link>
+                  <Link role="menuitem" href="/admin/movies" onClick={() => setMenuOpen(false)} className="mt-1 block rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Додати фільм</Link>
+                </>}
                 <button role="menuitem" type="button" onClick={signOut} className="mt-1 w-full rounded-lg px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-white/[0.05] hover:text-white">Вийти</button>
               </div>
             )}
@@ -128,7 +131,10 @@ export default function Navbar() {
         {mobileNavOpen && <nav id="mobile-navigation" aria-label="Мобільна навігація" className="absolute left-4 right-4 top-full z-50 rounded-xl border border-white/[0.08] bg-[#121721] p-2 shadow-2xl md:hidden">
           <Link href="/" onClick={() => setMobileNavOpen(false)} aria-current={pathname === "/" ? "page" : undefined} className="block rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/[0.05]">Афіша</Link>
           <Link href="/tickets/my" onClick={() => setMobileNavOpen(false)} aria-current={pathname.startsWith("/tickets") ? "page" : undefined} className="block rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/[0.05]">Мої квитки</Link>
-          {user && ["ADMIN", "MODERATOR"].includes(user.role?.toUpperCase() || "") && <Link href="/admin/sessions" onClick={() => setMobileNavOpen(false)} className="block rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/[0.05]">Адмін-панель</Link>}
+          {user && ["ADMIN", "MODERATOR"].includes(user.role?.toUpperCase() || "") && <>
+            <Link href="/admin/sessions" onClick={() => setMobileNavOpen(false)} className="block rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/[0.05]">Адмін-панель</Link>
+            <Link href="/admin/movies" onClick={() => setMobileNavOpen(false)} className="block rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/[0.05]">Додати фільм</Link>
+          </>}
           {!user && <div className="mt-1 grid grid-cols-2 gap-2 border-t border-white/[0.07] p-2 pt-3"><Link href="/login" onClick={() => setMobileNavOpen(false)} className="rounded-lg bg-[#19202c] px-3 py-2.5 text-center text-sm font-semibold text-slate-200">Увійти</Link><Link href="/register" onClick={() => setMobileNavOpen(false)} className="rounded-lg bg-[#e3262d] px-3 py-2.5 text-center text-sm font-semibold text-white">Реєстрація</Link></div>}
           {user && <button type="button" onClick={signOut} className="mt-1 w-full border-t border-white/[0.07] px-3 py-3 text-left text-sm text-slate-300">Вийти</button>}
         </nav>}

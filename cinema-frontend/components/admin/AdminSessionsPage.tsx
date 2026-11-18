@@ -411,9 +411,12 @@ export default function AdminSessionsPage() {
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[216px] flex-col border-r border-white/[0.06] bg-[#111620] px-4 py-7 md:flex">
         <Link href="/" className="px-2 text-[25px] font-extrabold tracking-tight text-white">KinoKlick</Link>
         <span className="mt-1 px-2 text-[10px] font-semibold tracking-wide text-slate-500">АДМІН-ПАНЕЛЬ</span>
-        <nav className="mt-11" aria-label="Адмін-навігація">
+        <nav className="mt-11 space-y-1" aria-label="Адмін-навігація">
           <Link href="/admin/sessions" aria-current="page" className="flex h-12 items-center gap-3 rounded-lg border-l-[3px] border-[#e3262d] bg-[#2b1b22] px-3 text-sm font-semibold text-rose-200">
             <CalendarIcon /> Сеанси
+          </Link>
+          <Link href="/admin/movies" className="flex h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-white">
+            <span aria-hidden="true">▣</span> Фільми
           </Link>
         </nav>
         <div className="mt-auto border-t border-white/[0.07] px-2 pt-5 text-xs leading-5 text-slate-500">

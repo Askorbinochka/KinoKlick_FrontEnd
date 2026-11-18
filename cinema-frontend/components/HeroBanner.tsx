@@ -17,6 +17,7 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
           src={imageUrl} 
           alt={movie.title} 
           fill
+          unoptimized
           preload
           sizes="100vw"
           className="object-cover object-[center_38%] opacity-45"

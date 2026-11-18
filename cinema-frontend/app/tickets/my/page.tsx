@@ -182,7 +182,7 @@ export default function MyTicketsPage() {
     return (
       <article key={ticket.id} className="flex flex-col gap-4 rounded-xl border border-white/[0.07] bg-[#121720] p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-lg bg-[#19202c]">
-          {movie?.posterUrl && <Image src={movie.posterUrl} alt={movie.title || "Постер фільму"} fill sizes="80px" className="object-cover" />}
+          {movie?.posterUrl && <Image src={movie.posterUrl} alt={movie.title || "Постер фільму"} fill unoptimized sizes="80px" className="object-cover" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

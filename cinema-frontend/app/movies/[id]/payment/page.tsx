@@ -268,7 +268,7 @@ function PaymentContent() {
             <aside className="lg:col-span-5">
               <div className="sticky top-16 space-y-4 rounded-2xl border border-slate-800 bg-[#111722] p-5">
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-                  {movie?.posterUrl && <Image src={movie.posterUrl} alt={movie.title || "Постер фільму"} fill sizes="(max-width: 1024px) 100vw, 420px" className="object-cover" />}
+                  {movie?.posterUrl && <Image src={movie.posterUrl} alt={movie.title || "Постер фільму"} fill unoptimized sizes="(max-width: 1024px) 100vw, 420px" className="object-cover" />}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{movie?.title || "Ваше замовлення"}</h2>
